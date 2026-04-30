@@ -1,0 +1,2634 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Te lo Imprimo - Presupuestos</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <!-- Firebase Configuration -->
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyB1inCo-ydOBIPR3idkOIBo0jSnP5fefFY",
+            authDomain: "presupuestostli.firebaseapp.com",
+            projectId: "presupuestostli",
+            storageBucket: "presupuestostli.firebasestorage.app",
+            messagingSenderId: "717471108766",
+            appId: "1:717471108766:web:76a807b8b4062bfab0b58f"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+    </script>
+    
+    <!-- React App -->
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        // Icons Component
+        const Icons = {
+            Plus: ({className="w-6 h-6"}) => (
+                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
+                </svg>
+            ),
+            Users: ({className="w-6 h-6"}) => (
+                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                </svg>
+            ),
+            FileText: ({className="w-6 h-6"}) => (
+                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+            ),
+            Settings: ({className="w-6 h-6"}) => (
+                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+            ),
+            Dashboard: ({className="w-6 h-6"}) => (
+                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                </svg>
+            ),
+            ArrowLeft: ({className="w-6 h-6"}) => (
+                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                </svg>
+            ),
+            Download: ({className="w-6 h-6"}) => (
+                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                </svg>
+            ),
+            Save: ({className="w-6 h-6"}) => (
+                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+                </svg>
+            ),
+            Trash2: ({className="w-6 h-6"}) => (
+                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+            ),
+            Edit2: ({className="w-6 h-6"}) => (
+                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+            ),
+            TrendingUp: ({className="w-6 h-6"}) => (
+                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                </svg>
+            ),
+            CheckCircle: ({className="w-6 h-6"}) => (
+                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            ),
+            Send: ({className="w-6 h-6"}) => (
+                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                </svg>
+            )
+        };
+
+        
+        // Login Component
+        function Login() {
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState('');
+
+            const handleLogin = async (e) => {
+                e.preventDefault();
+                setLoading(true);
+                setError('');
+
+                try {
+                    await auth.signInWithEmailAndPassword(email, password);
+                } catch (err) {
+                    console.error('Error al iniciar sesión:', err);
+                    if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+                        setError('Email o contraseña incorrectos');
+                    } else if (err.code === 'auth/invalid-email') {
+                        setError('Email inválido');
+                    } else {
+                        setError('Error al iniciar sesión. Intenta de nuevo.');
+                    }
+                    setLoading(false);
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center p-4">
+                    <div className="max-w-md w-full">
+                        <div className="bg-white rounded-2xl shadow-2xl p-8">
+                            <div className="text-center mb-8">
+                                <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-4 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+                                    <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                                    </svg>
+                                </div>
+                                <h1 className="text-3xl font-bold text-gray-800 mb-2">Te lo Imprimo</h1>
+                                <p className="text-gray-600">Sistema de Presupuestos</p>
+                            </div>
+
+                            <form onSubmit={handleLogin} className="space-y-6">
+                                {error && (
+                                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                                        {error}
+                                    </div>
+                                )}
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                                    <input
+                                        type="email"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        placeholder="tu@email.com"
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Contraseña</label>
+                                    <input
+                                        type="password"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        placeholder="••••••••"
+                                        required
+                                    />
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    disabled={loading}
+                                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Main App Component
+        function App() {
+            const [user, setUser] = useState(null);
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                const unsubscribe = auth.onAuthStateChanged((user) => {
+                    setUser(user);
+                    setLoading(false);
+                });
+                return () => unsubscribe();
+            }, []);
+
+            const handleLogout = async () => {
+                if (window.confirm('¿Estás seguro de que quieres cerrar sesión?')) {
+                    await auth.signOut();
+                }
+            };
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+                        <div className="text-center">
+                            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto"></div>
+                            <p className="mt-4 text-slate-600">Cargando...</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (!user) {
+                return <Login />;
+            }
+
+            return <MainApp user={user} onLogout={handleLogout} />;
+        }
+
+        // Settings Component
+        function SettingsView({ config, onSave }) {
+            const [editableConfig, setEditableConfig] = useState(config);
+            const [isSaving, setIsSaving] = useState(false);
+            const [isExporting, setIsExporting] = useState(false);
+
+            // Actualizar cuando cambie config desde Firebase
+            useEffect(() => {
+                setEditableConfig(config);
+            }, [config]);
+
+            const handleLogoUpload = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = async (event) => {
+                        const newConfig = { ...editableConfig, logo: event.target.result };
+                        setEditableConfig(newConfig);
+                        await onSave(newConfig);
+                        alert('Logo guardado y sincronizado!');
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            const handleSaveConfig = async () => {
+                setIsSaving(true);
+                try {
+                    await onSave(editableConfig);
+                    alert('Configuración guardada correctamente!');
+                } catch (error) {
+                    console.error('Error al guardar:', error);
+                    alert('Error al guardar la configuración');
+                }
+                setIsSaving(false);
+            };
+
+            // NUEVA FUNCIÓN: Exportar todos los datos en JSON
+            const exportToJSON = async () => {
+                setIsExporting(true);
+                try {
+                    // Obtener todos los datos de Firebase
+                    const clientsSnapshot = await db.collection('clients').get();
+                    const quotesSnapshot = await db.collection('quotes').get();
+                    const configSnapshot = await db.collection('config').doc('company').get();
+
+                    const clients = clientsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    const quotes = quotesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    const config = configSnapshot.exists ? configSnapshot.data() : {};
+
+                    const backupData = {
+                        exportDate: new Date().toISOString(),
+                        version: '1.0',
+                        clients: clients,
+                        quotes: quotes,
+                        config: config,
+                        totalClients: clients.length,
+                        totalQuotes: quotes.length
+                    };
+
+                    // Crear archivo JSON
+                    const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    const today = new Date().toISOString().split('T')[0];
+                    a.download = `backup-teloimprimooficial-${today}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+
+                    alert(`✅ Backup creado exitosamente!\n\nClientes: ${clients.length}\nPresupuestos: ${quotes.length}`);
+                } catch (error) {
+                    console.error('Error al exportar:', error);
+                    alert('Error al crear el backup');
+                }
+                setIsExporting(false);
+            };
+
+            // NUEVA FUNCIÓN: Exportar a Excel
+            const exportToExcel = async () => {
+                setIsExporting(true);
+                try {
+                    // Obtener todos los datos
+                    const clientsSnapshot = await db.collection('clients').get();
+                    const quotesSnapshot = await db.collection('quotes').get();
+
+                    const clients = clientsSnapshot.docs.map(doc => {
+                        const data = doc.data();
+                        return {
+                            'ID': doc.id,
+                            'Nombre': data.name || '',
+                            'RIF/CI': data.rif || '',
+                            'Email': data.email || '',
+                            'Teléfono': data.phone || '',
+                            'Dirección': data.address || ''
+                        };
+                    });
+
+                    const quotes = quotesSnapshot.docs.map(doc => {
+                        const data = doc.data();
+                        const subtotal = data.items?.reduce((sum, item) => 
+                            sum + ((item.quantity || 0) * (item.unitPrice || 0)), 0) || 0;
+                        const total = data.includeIva ? subtotal * 1.16 : subtotal;
+                        
+                        return {
+                            'Número': data.number || '',
+                            'Fecha': data.date || '',
+                            'Cliente': data.client?.name || 'N/A',
+                            'Vendedor': data.seller || '',
+                            'Subtotal': subtotal.toFixed(2),
+                            'Con IVA': data.includeIva ? 'Sí' : 'No',
+                            'Total': total.toFixed(2),
+                            'Estado': data.status || 'borrador',
+                            'Condiciones': data.paymentConditions || '',
+                            'Notas': data.notes || ''
+                        };
+                    });
+
+                    // Crear CSV (compatible con Excel)
+                    const createCSV = (data, headers) => {
+                        const headerRow = headers.join(',');
+                        const rows = data.map(row => 
+                            headers.map(header => {
+                                const value = row[header] || '';
+                                // Escapar comillas y agregar comillas si hay comas
+                                return value.toString().includes(',') ? `"${value}"` : value;
+                            }).join(',')
+                        );
+                        return [headerRow, ...rows].join('\n');
+                    };
+
+                    const clientsCSV = createCSV(clients, Object.keys(clients[0] || {}));
+                    const quotesCSV = createCSV(quotes, Object.keys(quotes[0] || {}));
+
+                    // Descargar Clientes
+                    const clientsBlob = new Blob(['\uFEFF' + clientsCSV], { type: 'text/csv;charset=utf-8;' });
+                    const clientsUrl = URL.createObjectURL(clientsBlob);
+                    const clientsLink = document.createElement('a');
+                    const today = new Date().toISOString().split('T')[0];
+                    clientsLink.href = clientsUrl;
+                    clientsLink.download = `clientes-${today}.csv`;
+                    document.body.appendChild(clientsLink);
+                    clientsLink.click();
+                    document.body.removeChild(clientsLink);
+
+                    // Descargar Presupuestos
+                    setTimeout(() => {
+                        const quotesBlob = new Blob(['\uFEFF' + quotesCSV], { type: 'text/csv;charset=utf-8;' });
+                        const quotesUrl = URL.createObjectURL(quotesBlob);
+                        const quotesLink = document.createElement('a');
+                        quotesLink.href = quotesUrl;
+                        quotesLink.download = `presupuestos-${today}.csv`;
+                        document.body.appendChild(quotesLink);
+                        quotesLink.click();
+                        document.body.removeChild(quotesLink);
+                        URL.revokeObjectURL(quotesUrl);
+                    }, 500);
+
+                    URL.revokeObjectURL(clientsUrl);
+
+                    alert(`✅ Archivos Excel/CSV creados!\n\n📄 clientes-${today}.csv\n📄 presupuestos-${today}.csv\n\nAbre con Excel o Google Sheets`);
+                } catch (error) {
+                    console.error('Error al exportar a Excel:', error);
+                    alert('Error al crear archivos Excel');
+                }
+                setIsExporting(false);
+            };
+
+            return (
+                <div className="max-w-4xl mx-auto p-6">
+                    <div className="bg-white rounded-xl shadow-lg p-6">
+                        <h2 className="text-2xl font-bold text-slate-800 mb-6">Configuración</h2>
+
+                        <div className="mb-6">
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">Logo de la Empresa</label>
+                            
+                            {editableConfig.logo && (
+                                <div className="mb-4 p-4 bg-slate-50 rounded-lg">
+                                    <img src={editableConfig.logo} alt="Logo" className="max-w-xs mx-auto" />
+                                </div>
+                            )}
+
+                            <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleLogoUpload}
+                                className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                            />
+                            <p className="text-sm text-slate-500 mt-2">
+                                Sube tu logo. Se sincronizará automáticamente en la nube y aparecerá en los PDFs.
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">Nombre de la Empresa *</label>
+                                <input
+                                    type="text"
+                                    value={editableConfig.companyName}
+                                    onChange={(e) => setEditableConfig({ ...editableConfig, companyName: e.target.value })}
+                                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    placeholder="Nombre de tu empresa"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">RIF *</label>
+                                <input
+                                    type="text"
+                                    value={editableConfig.rif}
+                                    onChange={(e) => setEditableConfig({ ...editableConfig, rif: e.target.value })}
+                                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    placeholder="J-XXXXXXXX-X"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">Email *</label>
+                                <input
+                                    type="email"
+                                    value={editableConfig.email}
+                                    onChange={(e) => setEditableConfig({ ...editableConfig, email: e.target.value })}
+                                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    placeholder="email@empresa.com"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">Sitio Web</label>
+                                <input
+                                    type="text"
+                                    value={editableConfig.website}
+                                    onChange={(e) => setEditableConfig({ ...editableConfig, website: e.target.value })}
+                                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    placeholder="www.tuempresa.com"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end">
+                            <button
+                                onClick={handleSaveConfig}
+                                disabled={isSaving}
+                                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                            >
+                                <Icons.Save className="w-5 h-5" />
+                                <span>{isSaving ? 'Guardando...' : 'Guardar Configuración'}</span>
+                            </button>
+                        </div>
+
+                        <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                            <p className="text-sm text-blue-800">
+                                💡 <strong>Tip:</strong> Esta información aparecerá en todos tus presupuestos en formato PDF.
+                            </p>
+                        </div>
+
+                        {/* NUEVA SECCIÓN: Backup y Exportar */}
+                        <div className="mt-8 pt-8 border-t border-slate-200">
+                            <h3 className="text-xl font-bold text-slate-800 mb-4">💾 Backup y Exportar Datos</h3>
+                            
+                            <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-6 mb-6">
+                                <p className="text-slate-700 mb-4">
+                                    <strong>¿Por qué hacer backup?</strong> Mantén una copia de seguridad de todos tus clientes y presupuestos. 
+                                    Es recomendable exportar tus datos mensualmente.
+                                </p>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Botón JSON */}
+                                    <div className="bg-white rounded-lg p-4 shadow-sm">
+                                        <div className="flex items-start mb-3">
+                                            <div className="bg-purple-100 p-2 rounded-lg mr-3">
+                                                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                </svg>
+                                            </div>
+                                            <div className="flex-1">
+                                                <h4 className="font-semibold text-slate-800 mb-1">Backup Completo (JSON)</h4>
+                                                <p className="text-sm text-slate-600 mb-3">
+                                                    Exporta TODOS los datos en formato JSON. Ideal para respaldo completo.
+                                                </p>
+                                                <button
+                                                    onClick={exportToJSON}
+                                                    disabled={isExporting}
+                                                    className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                                                >
+                                                    <Icons.Download className="w-4 h-4" />
+                                                    <span>{isExporting ? 'Exportando...' : 'Descargar JSON'}</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Botón Excel */}
+                                    <div className="bg-white rounded-lg p-4 shadow-sm">
+                                        <div className="flex items-start mb-3">
+                                            <div className="bg-green-100 p-2 rounded-lg mr-3">
+                                                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                </svg>
+                                            </div>
+                                            <div className="flex-1">
+                                                <h4 className="font-semibold text-slate-800 mb-1">Exportar a Excel/CSV</h4>
+                                                <p className="text-sm text-slate-600 mb-3">
+                                                    Descarga tablas de clientes y presupuestos para abrir en Excel.
+                                                </p>
+                                                <button
+                                                    onClick={exportToExcel}
+                                                    disabled={isExporting}
+                                                    className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                                                >
+                                                    <Icons.Download className="w-4 h-4" />
+                                                    <span>{isExporting ? 'Exportando...' : 'Descargar Excel/CSV'}</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                    <p className="text-sm text-yellow-800">
+                                        <strong>💡 Recomendación:</strong> Guarda los archivos exportados en Google Drive, Dropbox o un disco externo. 
+                                        Se sugiere hacer backup mensualmente.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Main App Component (after login)
+        function MainApp({ user, onLogout }) {
+            const [view, setView] = useState('dashboard'); // Cambiado a 'dashboard' como vista inicial
+            const [clients, setClients] = useState([]);
+            const [quotes, setQuotes] = useState([]);
+            const [config, setConfig] = useState({
+                logo: '',
+                companyName: 'TLI - TE LO IMPRIMO',
+                rif: 'J-XXXXXXXX-X',
+                email: 'teloimprimooficial@gmail.com',
+                website: 'www.teloimprimooficial.com'
+            });
+            const [currentQuote, setCurrentQuote] = useState(null);
+
+            // Restaurar presupuesto temporal si existe
+            useEffect(() => {
+                const tempQuote = sessionStorage.getItem('tempQuote');
+                if (tempQuote) {
+                    try {
+                        const parsedQuote = JSON.parse(tempQuote);
+                        setCurrentQuote(parsedQuote);
+                        setView('quote');
+                        // No eliminar aún, lo haremos cuando seleccionen el cliente
+                    } catch (e) {
+                        sessionStorage.removeItem('tempQuote');
+                    }
+                }
+            }, []);
+
+            // Load data from Firebase
+            useEffect(() => {
+                if (!user) return;
+
+                // Load clients
+                const unsubClients = db.collection('clients')
+                    .onSnapshot(snapshot => {
+                        const clientsData = snapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        }));
+                        setClients(clientsData);
+                    });
+
+                // Load quotes and update old ones without status
+                const unsubQuotes = db.collection('quotes')
+                    .onSnapshot(snapshot => {
+                        const quotesData = snapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        }));
+                        
+                        // Update quotes without status field
+                        quotesData.forEach(async (quote) => {
+                            if (!quote.status) {
+                                await db.collection('quotes').doc(quote.id).update({
+                                    status: 'borrador'
+                                });
+                            }
+                        });
+                        
+                        setQuotes(quotesData);
+                    });
+
+                // Load config
+                const unsubConfig = db.collection('config')
+                    .doc('company')
+                    .onSnapshot(doc => {
+                        if (doc.exists) {
+                            setConfig(prev => ({ ...prev, ...doc.data() }));
+                        }
+                    });
+
+                return () => {
+                    unsubClients();
+                    unsubQuotes();
+                    unsubConfig();
+                };
+            }, [user]);
+
+            // Save functions
+            const saveClient = async (client) => {
+                if (client.id) {
+                    await db.collection('clients').doc(client.id).update(client);
+                } else {
+                    await db.collection('clients').add(client);
+                }
+            };
+
+            const deleteClient = async (clientId) => {
+                if (window.confirm('¿Estás seguro de eliminar este cliente?')) {
+                    await db.collection('clients').doc(clientId).delete();
+                }
+            };
+
+            const saveQuote = async (quote) => {
+                // Agregar estado por defecto si no existe
+                if (!quote.status) {
+                    quote.status = 'borrador';
+                }
+                
+                if (quote.id) {
+                    await db.collection('quotes').doc(quote.id).update(quote);
+                } else {
+                    await db.collection('quotes').add(quote);
+                }
+            };
+
+            const deleteQuote = async (quoteId) => {
+                if (window.confirm('¿Estás seguro de eliminar este presupuesto?')) {
+                    await db.collection('quotes').doc(quoteId).delete();
+                }
+            };
+
+            const updateQuoteStatus = async (quoteId, newStatus) => {
+                await db.collection('quotes').doc(quoteId).update({
+                    status: newStatus
+                });
+            };
+
+            const saveConfigData = async (configData) => {
+                await db.collection('config').doc('company').set(configData);
+                setConfig(configData);
+            };
+
+            // Navigation
+            const NavBar = () => (
+                <div className="bg-white shadow-md">
+                    <div className="max-w-7xl mx-auto px-4">
+                        <div className="flex justify-between items-center py-4">
+                            <div className="flex items-center space-x-2">
+                                <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-2 rounded-lg">
+                                    <Icons.FileText className="w-6 h-6 text-white" />
+                                </div>
+                                <h1 className="text-xl font-bold text-slate-800">Te lo Imprimo</h1>
+                            </div>
+                            <div className="flex items-center space-x-4">
+                                <span className="text-sm text-slate-600">{user.email}</span>
+                                <button
+                                    onClick={onLogout}
+                                    className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm"
+                                >
+                                    Cerrar Sesión
+                                </button>
+                            </div>
+                        </div>
+                        <div className="flex space-x-1 pb-2 overflow-x-auto">
+                            <button
+                                onClick={() => setView('dashboard')}
+                                className={`px-4 py-2 rounded-lg flex items-center space-x-2 whitespace-nowrap ${
+                                    view === 'dashboard' ? 'bg-blue-100 text-blue-700' : 'text-slate-600 hover:bg-slate-100'
+                                }`}
+                            >
+                                <Icons.Dashboard className="w-5 h-5" />
+                                <span>Dashboard</span>
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setCurrentQuote(null);
+                                    setView('quote');
+                                }}
+                                className={`px-4 py-2 rounded-lg flex items-center space-x-2 whitespace-nowrap ${
+                                    view === 'quote' && !currentQuote ? 'bg-blue-100 text-blue-700' : 'text-slate-600 hover:bg-slate-100'
+                                }`}
+                            >
+                                <Icons.Plus className="w-5 h-5" />
+                                <span>Nuevo Presupuesto</span>
+                            </button>
+                            <button
+                                onClick={() => setView('clients')}
+                                className={`px-4 py-2 rounded-lg flex items-center space-x-2 whitespace-nowrap ${
+                                    view === 'clients' ? 'bg-blue-100 text-blue-700' : 'text-slate-600 hover:bg-slate-100'
+                                }`}
+                            >
+                                <Icons.Users className="w-5 h-5" />
+                                <span>Clientes</span>
+                            </button>
+                            <button
+                                onClick={() => setView('quotes')}
+                                className={`px-4 py-2 rounded-lg flex items-center space-x-2 whitespace-nowrap ${
+                                    view === 'quotes' ? 'bg-blue-100 text-blue-700' : 'text-slate-600 hover:bg-slate-100'
+                                }`}
+                            >
+                                <Icons.FileText className="w-5 h-5" />
+                                <span>Presupuestos</span>
+                            </button>
+                            <button
+                                onClick={() => setView('settings')}
+                                className={`px-4 py-2 rounded-lg flex items-center space-x-2 whitespace-nowrap ${
+                                    view === 'settings' ? 'bg-blue-100 text-blue-700' : 'text-slate-600 hover:bg-slate-100'
+                                }`}
+                            >
+                                <Icons.Settings className="w-5 h-5" />
+                                <span>Configuración</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            // Dashboard View
+            if (view === 'dashboard') {
+                return (
+                    <div className="min-h-screen bg-slate-50">
+                        <NavBar />
+                        <Dashboard 
+                            quotes={quotes} 
+                            onViewQuote={(quote) => {
+                                setCurrentQuote(quote);
+                                setView('quote');
+                            }}
+                            onDeleteQuote={deleteQuote}
+                            onUpdateStatus={updateQuoteStatus}
+                        />
+                    </div>
+                );
+            }
+
+            // Quote view
+            if (view === 'quote') {
+                return (
+                    <div className="min-h-screen bg-slate-50">
+                        <NavBar />
+                        <QuoteForm
+                            quote={currentQuote}
+                            clients={clients}
+                            config={config}
+                            onSave={async (quote) => {
+                                await saveQuote(quote);
+                                setView('dashboard');
+                            }}
+                            onCancel={() => setView('dashboard')}
+                            onGoToClients={(quoteData) => {
+                                sessionStorage.setItem('tempQuote', JSON.stringify(quoteData));
+                                setView('clients');
+                            }}
+                        />
+                    </div>
+                );
+            }
+
+            // Clients view
+            if (view === 'clients') {
+                return (
+                    <div className="min-h-screen bg-slate-50">
+                        <NavBar />
+                        <ClientsManager
+                            clients={clients}
+                            onSave={saveClient}
+                            onDelete={deleteClient}
+                        />
+                    </div>
+                );
+            }
+
+            // Quotes list view
+            if (view === 'quotes') {
+                return (
+                    <div className="min-h-screen bg-slate-50">
+                        <NavBar />
+                        <QuotesListView 
+                            quotes={quotes}
+                            onViewQuote={(quote) => {
+                                setCurrentQuote(quote);
+                                setView('quote');
+                            }}
+                            onDeleteQuote={deleteQuote}
+                            onUpdateStatus={updateQuoteStatus}
+                        />
+                    </div>
+                );
+            }
+
+            // Settings view
+            if (view === 'settings') {
+                return (
+                    <div className="min-h-screen bg-slate-50">
+                        <NavBar />
+                        <SettingsView config={config} onSave={saveConfigData} />
+                    </div>
+                );
+            }
+
+            return null;
+        }
+
+        // Función para normalizar fechas (soporta múltiples formatos)
+        function parseQuoteDate(dateStr) {
+            if (!dateStr) return null;
+            
+            // Si ya es un objeto Date, retornarlo
+            if (dateStr instanceof Date) return dateStr;
+            
+            // Formato ISO: "2026-02-01" o "2026-2-1"
+            if (dateStr.match(/^\d{4}-\d{1,2}-\d{1,2}$/)) {
+                const [year, month, day] = dateStr.split('-').map(Number);
+                return new Date(year, month - 1, day); // month - 1 porque Date usa 0-11
+            }
+            
+            // Formato DD/MM/YYYY: "01/02/2026" o "1/2/2026"
+            if (dateStr.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
+                const [day, month, year] = dateStr.split('/').map(Number);
+                return new Date(year, month - 1, day); // month - 1 porque Date usa 0-11
+            }
+            
+            // Fallback: intentar parsear con Date
+            return new Date(dateStr);
+        }
+
+        // Quotes List View Component (separado para poder usar hooks)
+        function QuotesListView({ quotes, onViewQuote, onDeleteQuote, onUpdateStatus }) {
+            const [searchTerm, setSearchTerm] = useState('');
+            const [statusFilter, setStatusFilter] = useState('all');
+            const [sortBy, setSortBy] = useState('date-desc');
+
+            // Filtrar y ordenar presupuestos
+            let filteredQuotes = quotes;
+
+            // 1. Filtrar por búsqueda
+            if (searchTerm) {
+                filteredQuotes = filteredQuotes.filter(q => {
+                    const searchLower = searchTerm.toLowerCase();
+                    const clientName = q.client?.name?.toLowerCase() || '';
+                    const quoteNumber = q.number?.toLowerCase() || '';
+                    const date = q.date?.toLowerCase() || '';
+                    
+                    return clientName.includes(searchLower) || 
+                           quoteNumber.includes(searchLower) || 
+                           date.includes(searchLower);
+                });
+            }
+
+            // 2. Filtrar por estado
+            if (statusFilter !== 'all') {
+                filteredQuotes = filteredQuotes.filter(q => 
+                    (q.status || 'borrador') === statusFilter
+                );
+            }
+
+            // 3. Ordenar
+            filteredQuotes = [...filteredQuotes].sort((a, b) => {
+                switch (sortBy) {
+                    case 'date-desc':
+                        return parseQuoteDate(b.date) - parseQuoteDate(a.date);
+                    case 'date-asc':
+                        return parseQuoteDate(a.date) - parseQuoteDate(b.date);
+                    case 'amount-desc':
+                        const totalA = a.items?.reduce((sum, item) => 
+                            sum + ((item.quantity || 0) * (item.unitPrice || 0)), 0) || 0;
+                        const totalB = b.items?.reduce((sum, item) => 
+                            sum + ((item.quantity || 0) * (item.unitPrice || 0)), 0) || 0;
+                        return totalB - totalA;
+                    case 'amount-asc':
+                        const totalA2 = a.items?.reduce((sum, item) => 
+                            sum + ((item.quantity || 0) * (item.unitPrice || 0)), 0) || 0;
+                        const totalB2 = b.items?.reduce((sum, item) => 
+                            sum + ((item.quantity || 0) * (item.unitPrice || 0)), 0) || 0;
+                        return totalA2 - totalB2;
+                    case 'client-asc':
+                        return (a.client?.name || '').localeCompare(b.client?.name || '');
+                    default:
+                        return 0;
+                }
+            });
+
+            return (
+                <div className="max-w-7xl mx-auto p-6">
+                    <h2 className="text-2xl font-bold text-slate-800 mb-6">Presupuestos Guardados</h2>
+                    
+                    {/* BARRA DE BÚSQUEDA Y FILTROS */}
+                    <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+                        {/* Barra de búsqueda */}
+                        <div className="mb-4">
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    placeholder="🔍 Buscar por número, cliente o fecha..."
+                                    className="w-full px-4 py-3 pr-10 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                                {searchTerm && (
+                                    <button
+                                        onClick={() => setSearchTerm('')}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+                                        </svg>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Filtros y ordenamiento */}
+                        <div className="flex flex-wrap gap-3 items-center">
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm font-semibold text-slate-700">Estado:</span>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setStatusFilter('all')}
+                                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                            statusFilter === 'all'
+                                                ? 'bg-slate-700 text-white'
+                                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                        }`}
+                                    >
+                                        Todos
+                                    </button>
+                                    <button
+                                        onClick={() => setStatusFilter('borrador')}
+                                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                            statusFilter === 'borrador'
+                                                ? 'bg-gray-600 text-white'
+                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        }`}
+                                    >
+                                        📝 Borradores
+                                    </button>
+                                    <button
+                                        onClick={() => setStatusFilter('enviado')}
+                                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                            statusFilter === 'enviado'
+                                                ? 'bg-blue-600 text-white'
+                                                : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+                                        }`}
+                                    >
+                                        → Enviados
+                                    </button>
+                                    <button
+                                        onClick={() => setStatusFilter('pagado')}
+                                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                            statusFilter === 'pagado'
+                                                ? 'bg-green-600 text-white'
+                                                : 'bg-green-100 text-green-600 hover:bg-green-200'
+                                        }`}
+                                    >
+                                        ✓ Pagados
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 ml-auto">
+                                <span className="text-sm font-semibold text-slate-700">Ordenar por:</span>
+                                <select
+                                    value={sortBy}
+                                    onChange={(e) => setSortBy(e.target.value)}
+                                    className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                                >
+                                    <option value="date-desc">Fecha (más reciente)</option>
+                                    <option value="date-asc">Fecha (más antigua)</option>
+                                    <option value="amount-desc">Monto (mayor a menor)</option>
+                                    <option value="amount-asc">Monto (menor a mayor)</option>
+                                    <option value="client-asc">Cliente (A-Z)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Contador de resultados */}
+                        {(searchTerm || statusFilter !== 'all') && (
+                            <div className="mt-3 pt-3 border-t border-slate-200">
+                                <p className="text-sm text-slate-600">
+                                    Mostrando <strong>{filteredQuotes.length}</strong> de {quotes.length} presupuestos
+                                </p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* GRID DE PRESUPUESTOS */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {filteredQuotes.map(q => {
+                            const subtotal = q.items?.reduce((sum, item) => {
+                                return sum + ((item.quantity || 0) * (item.unitPrice || 0));
+                            }, 0) || 0;
+                            const totalWithIva = q.includeIva ? subtotal * 1.16 : subtotal;
+
+                            return (
+                                <div key={q.id} className="bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow">
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div className="flex-1">
+                                            <h3 className="font-bold text-lg">{q.number}</h3>
+                                            <p className="text-sm text-slate-600">
+                                                Cliente: {q.client ? q.client.name : 'N/A'}
+                                            </p>
+                                            <p className="text-sm text-slate-600">Fecha: {q.date}</p>
+                                            <p className="text-sm text-slate-500 mb-1">
+                                                Subtotal: ${subtotal.toFixed(2)}
+                                            </p>
+                                            <p className="text-sm font-semibold text-blue-600">
+                                                Total: ${totalWithIva.toFixed(2)}
+                                            </p>
+                                        </div>
+                                        <div className="flex space-x-1">
+                                            <button
+                                                onClick={() => onViewQuote(q)}
+                                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                                                title="Editar"
+                                            >
+                                                <Icons.Edit2 className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => onDeleteQuote(q.id)}
+                                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                                                title="Eliminar"
+                                            >
+                                                <Icons.Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Estado con botones */}
+                                    <div className="mt-3 pt-3 border-t border-slate-200">
+                                        <p className="text-xs text-slate-500 mb-2">Estado:</p>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => onUpdateStatus(q.id, 'borrador')}
+                                                className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                                                    (!q.status || q.status === 'borrador')
+                                                        ? 'bg-gray-600 text-white'
+                                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                                }`}
+                                            >
+                                                📝 Borrador
+                                            </button>
+                                            <button
+                                                onClick={() => onUpdateStatus(q.id, 'enviado')}
+                                                className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                                                    q.status === 'enviado'
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+                                                }`}
+                                            >
+                                                → Enviado
+                                            </button>
+                                            <button
+                                                onClick={() => onUpdateStatus(q.id, 'pagado')}
+                                                className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                                                    q.status === 'pagado'
+                                                        ? 'bg-green-600 text-white'
+                                                        : 'bg-green-100 text-green-600 hover:bg-green-200'
+                                                }`}
+                                            >
+                                                ✓ Pagado
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+
+                        {filteredQuotes.length === 0 && (
+                            <div className="col-span-full text-center py-12 text-slate-500">
+                                {searchTerm || statusFilter !== 'all' 
+                                    ? '🔍 No se encontraron presupuestos con los filtros seleccionados'
+                                    : 'No hay presupuestos guardados'}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // Dashboard Component
+        function Dashboard({ quotes, onViewQuote, onDeleteQuote, onUpdateStatus }) {
+            const [selectedMonth, setSelectedMonth] = useState('current');
+            
+            // Obtener fecha actual
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            const currentMonth = now.getMonth();
+            
+            // Calcular presupuestos del mes actual (para el caso 'current')
+            const currentMonthQuotes = quotes.filter(q => {
+                if (!q.date) return false;
+                const quoteDate = parseQuoteDate(q.date);
+                if (!quoteDate) return false;
+                return quoteDate.getFullYear() === currentYear && quoteDate.getMonth() === currentMonth;
+            });
+            
+            // MODIFICACIÓN CLAVE: Filtrar presupuestos según el filtro seleccionado
+            const filteredQuotes = selectedMonth === 'current' 
+                ? currentMonthQuotes 
+                : selectedMonth === 'all'
+                ? quotes
+                : quotes.filter(q => {
+                    if (!q.date) return false;
+                    const quoteDate = parseQuoteDate(q.date);
+                    if (!quoteDate) return false;
+                    const [year, month] = selectedMonth.split('-');
+                    return quoteDate.getFullYear() === parseInt(year) && quoteDate.getMonth() === parseInt(month);
+                });
+            
+            // MODIFICACIÓN CLAVE: Calcular estadísticas basadas en filteredQuotes en lugar de currentMonthQuotes
+            const borradorCount = filteredQuotes.filter(q => !q.status || q.status === 'borrador').length;
+            const enviadoCount = filteredQuotes.filter(q => q.status === 'enviado').length;
+            const pagadoCount = filteredQuotes.filter(q => q.status === 'pagado').length;
+            
+            // Calcular total vendido (sin IVA, solo presupuestos pagados) - ahora dinámico
+            const totalVendido = filteredQuotes
+                .filter(q => q.status === 'pagado')
+                .reduce((sum, q) => {
+                    const subtotal = q.items?.reduce((itemSum, item) => {
+                        return itemSum + ((item.quantity || 0) * (item.unitPrice || 0));
+                    }, 0) || 0;
+                    return sum + subtotal;
+                }, 0);
+            
+            // Calcular efectividad de ventas (presupuestos totales vs pagados) - ahora dinámico
+            const totalPresupuestos = filteredQuotes.length;
+            const efectividadPorcentaje = totalPresupuestos > 0 
+                ? ((pagadoCount / totalPresupuestos) * 100).toFixed(1) 
+                : 0;
+            
+            // Calcular tasa de conversión (enviados a pagados)
+            const conversionRate = enviadoCount > 0 ? ((pagadoCount / enviadoCount) * 100).toFixed(1) : 0;
+            
+            // NUEVO: Calcular presupuestos pendientes de seguimiento
+            const calculateDaysSince = (dateStr) => {
+                if (!dateStr) return 0;
+                const quoteDate = parseQuoteDate(dateStr);
+                if (!quoteDate) return 0;
+                const diffTime = Math.abs(now - quoteDate);
+                const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                return diffDays;
+            };
+            
+            const pendingFollowUp = quotes
+                .filter(q => q.status === 'enviado') // Solo los enviados
+                .map(q => ({
+                    ...q,
+                    daysSince: calculateDaysSince(q.date)
+                }))
+                .sort((a, b) => b.daysSince - a.daysSince); // Más antiguos primero
+            
+            // Categorizar por urgencia
+            const urgentFollowUp = pendingFollowUp.filter(q => q.daysSince >= 7); // 7+ días
+            const recentFollowUp = pendingFollowUp.filter(q => q.daysSince >= 3 && q.daysSince < 7); // 3-6 días
+            
+            // Datos para el gráfico anual
+            const mesesNombres = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+            const ventasPorMes = Array(12).fill(0);
+            
+            quotes.filter(q => q.status === 'pagado').forEach(q => {
+                if (!q.date) return;
+                const quoteDate = parseQuoteDate(q.date);
+                if (!quoteDate) return;
+                if (quoteDate.getFullYear() === currentYear) {
+                    const mes = quoteDate.getMonth();
+                    const subtotal = q.items?.reduce((sum, item) => {
+                        return sum + ((item.quantity || 0) * (item.unitPrice || 0));
+                    }, 0) || 0;
+                    ventasPorMes[mes] += subtotal;
+                }
+            });
+            
+            const maxVenta = Math.max(...ventasPorMes, 1);
+            
+            // Generar opciones de meses
+            const monthOptions = [];
+            const oldestQuote = quotes.reduce((oldest, q) => {
+                if (!q.date) return oldest;
+                const qDate = parseQuoteDate(q.date);
+                if (!qDate) return oldest;
+                return !oldest || qDate < oldest ? qDate : oldest;
+            }, null);
+            
+            if (oldestQuote) {
+                let date = new Date(oldestQuote);
+                const endDate = new Date();
+                while (date <= endDate) {
+                    const year = date.getFullYear();
+                    const month = date.getMonth();
+                    monthOptions.unshift({
+                        value: `${year}-${month}`,
+                        label: `${mesesNombres[month]} ${year}`
+                    });
+                    date.setMonth(date.getMonth() + 1);
+                }
+            }
+            
+            return (
+                <div className="max-w-7xl mx-auto p-6">
+                    {/* Header */}
+                    <div className="mb-6">
+                        <h1 className="text-3xl font-bold text-slate-800">Dashboard</h1>
+                        <p className="text-slate-600 mt-1">
+                            {selectedMonth === 'current' 
+                                ? `${mesesNombres[currentMonth]} ${currentYear}` 
+                                : selectedMonth === 'all'
+                                ? `Todo el año ${currentYear}`
+                                : (() => {
+                                    const [year, month] = selectedMonth.split('-');
+                                    return `${mesesNombres[parseInt(month)]} ${year}`;
+                                })()
+                            }
+                        </p>
+                    </div>
+                    
+                    {/* Tarjetas de estadísticas */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+                        <div className="bg-white rounded-xl shadow-md p-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="bg-gray-100 p-3 rounded-lg">
+                                    <Icons.FileText className="w-6 h-6 text-gray-600" />
+                                </div>
+                            </div>
+                            <p className="text-sm text-slate-600 mb-1">Borradores</p>
+                            <p className="text-3xl font-bold text-slate-800">{borradorCount}</p>
+                        </div>
+                        
+                        <div className="bg-white rounded-xl shadow-md p-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="bg-blue-100 p-3 rounded-lg">
+                                    <Icons.Send className="w-6 h-6 text-blue-600" />
+                                </div>
+                            </div>
+                            <p className="text-sm text-slate-600 mb-1">Enviados</p>
+                            <p className="text-3xl font-bold text-slate-800">{enviadoCount}</p>
+                        </div>
+                        
+                        <div className="bg-white rounded-xl shadow-md p-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="bg-green-100 p-3 rounded-lg">
+                                    <Icons.CheckCircle className="w-6 h-6 text-green-600" />
+                                </div>
+                            </div>
+                            <p className="text-sm text-slate-600 mb-1">Pagados</p>
+                            <p className="text-3xl font-bold text-slate-800">{pagadoCount}</p>
+                        </div>
+                        
+                        <div className="bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl shadow-md p-6 text-white">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="bg-white bg-opacity-20 p-3 rounded-lg">
+                                    <Icons.TrendingUp className="w-6 h-6" />
+                                </div>
+                            </div>
+                            <p className="text-sm opacity-90 mb-1">Efectividad</p>
+                            <p className="text-3xl font-bold">{efectividadPorcentaje}%</p>
+                            <p className="text-xs opacity-75 mt-1">{pagadoCount} de {totalPresupuestos} presupuestos</p>
+                        </div>
+                        
+                        <div className="bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl shadow-md p-6 text-white">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="bg-white bg-opacity-20 p-3 rounded-lg">
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <p className="text-sm opacity-90 mb-1">Total Vendido (sin IVA)</p>
+                            <p className="text-3xl font-bold">${totalVendido.toFixed(2)}</p>
+                        </div>
+                    </div>
+                    
+                    {/* NUEVO: Widget de Seguimiento */}
+                    {pendingFollowUp.length > 0 && (
+                        <div className="bg-gradient-to-r from-orange-50 to-red-50 border-l-4 border-orange-500 rounded-lg p-6 mb-8">
+                            <div className="flex items-start justify-between mb-4">
+                                <div>
+                                    <h3 className="text-lg font-bold text-slate-800 flex items-center">
+                                        <svg className="w-6 h-6 text-orange-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                        </svg>
+                                        Presupuestos Pendientes de Seguimiento
+                                    </h3>
+                                    <p className="text-sm text-slate-600 mt-1">
+                                        {pendingFollowUp.length} presupuesto{pendingFollowUp.length !== 1 ? 's' : ''} enviado{pendingFollowUp.length !== 1 ? 's' : ''} sin respuesta
+                                    </p>
+                                </div>
+                                <div className="flex gap-2">
+                                    {urgentFollowUp.length > 0 && (
+                                        <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-semibold">
+                                            {urgentFollowUp.length} Urgente{urgentFollowUp.length !== 1 ? 's' : ''} (7+ días)
+                                        </span>
+                                    )}
+                                    {recentFollowUp.length > 0 && (
+                                        <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-semibold">
+                                            {recentFollowUp.length} Reciente{recentFollowUp.length !== 1 ? 's' : ''} (3-6 días)
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {pendingFollowUp.slice(0, 6).map(q => {
+                                    const subtotal = q.items?.reduce((sum, item) => 
+                                        sum + ((item.quantity || 0) * (item.unitPrice || 0)), 0) || 0;
+                                    const urgencyColor = q.daysSince >= 7 
+                                        ? 'border-red-300 bg-red-50' 
+                                        : q.daysSince >= 3 
+                                        ? 'border-yellow-300 bg-yellow-50'
+                                        : 'border-blue-300 bg-blue-50';
+                                    
+                                    return (
+                                        <div 
+                                            key={q.id} 
+                                            className={`border-2 ${urgencyColor} rounded-lg p-4 hover:shadow-lg transition-shadow cursor-pointer`}
+                                            onClick={() => onViewQuote(q)}
+                                        >
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div>
+                                                    <h4 className="font-bold text-slate-800">{q.number}</h4>
+                                                    <p className="text-sm text-slate-600">{q.client?.name || 'Sin cliente'}</p>
+                                                </div>
+                                                <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                                    q.daysSince >= 7 ? 'bg-red-200 text-red-800' :
+                                                    q.daysSince >= 3 ? 'bg-yellow-200 text-yellow-800' :
+                                                    'bg-blue-200 text-blue-800'
+                                                }`}>
+                                                    {q.daysSince} día{q.daysSince !== 1 ? 's' : ''}
+                                                </span>
+                                            </div>
+                                            <p className="text-sm text-slate-600 mb-2">
+                                                <strong>Fecha:</strong> {q.date}
+                                            </p>
+                                            <p className="text-sm font-semibold text-blue-600">
+                                                Monto: ${subtotal.toFixed(2)}
+                                            </p>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onViewQuote(q);
+                                                }}
+                                                className="mt-3 w-full px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                                            >
+                                                📞 Hacer Seguimiento
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {pendingFollowUp.length > 6 && (
+                                <div className="mt-4 text-center">
+                                    <p className="text-sm text-slate-600">
+                                        ... y {pendingFollowUp.length - 6} más. Ve a "Presupuestos" para ver todos.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    
+                    {/* Gráfico de barras */}
+                    <div className="bg-white rounded-xl shadow-md p-6 mb-8">
+                        <h3 className="text-lg font-bold text-slate-800 mb-6">Ventas por Mes - {currentYear}</h3>
+                        <div className="flex items-end justify-between h-64 space-x-2">
+                            {ventasPorMes.map((venta, index) => (
+                                <div key={index} className="flex-1 flex flex-col items-center">
+                                    <div className="w-full flex flex-col justify-end" style={{ height: '100%' }}>
+                                        <div
+                                            className="w-full bg-gradient-to-t from-blue-600 to-purple-600 rounded-t-lg transition-all hover:opacity-80 cursor-pointer relative group"
+                                            style={{ height: `${(venta / maxVenta) * 100}%`, minHeight: venta > 0 ? '4px' : '0' }}
+                                        >
+                                            {venta > 0 && (
+                                                <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                                    ${venta.toFixed(0)}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-slate-600 mt-2">{mesesNombres[index]}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    
+                    {/* Lista de presupuestos */}
+                    <div className="bg-white rounded-xl shadow-md p-6">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-lg font-bold text-slate-800">Presupuestos</h3>
+                            <select
+                                value={selectedMonth}
+                                onChange={(e) => setSelectedMonth(e.target.value)}
+                                className="px-4 py-2 border border-slate-300 rounded-lg text-sm"
+                            >
+                                <option value="current">Mes Actual</option>
+                                <option value="all">Todos</option>
+                                {monthOptions.map(opt => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                ))}
+                            </select>
+                        </div>
+                        
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead>
+                                    <tr className="border-b border-slate-200">
+                                        <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Número</th>
+                                        <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Fecha</th>
+                                        <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Cliente</th>
+                                        <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">Monto (sin IVA)</th>
+                                        <th className="text-center py-3 px-4 text-sm font-semibold text-slate-700">Estado</th>
+                                        <th className="text-center py-3 px-4 text-sm font-semibold text-slate-700">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredQuotes.sort((a, b) => new Date(b.date) - new Date(a.date)).map(quote => {
+                                        const subtotal = quote.items?.reduce((sum, item) => {
+                                            return sum + ((item.quantity || 0) * (item.unitPrice || 0));
+                                        }, 0) || 0;
+                                        
+                                        return (
+                                            <tr key={quote.id} className="border-b border-slate-100 hover:bg-slate-50">
+                                                <td className="py-3 px-4 text-sm font-medium text-slate-800">{quote.number}</td>
+                                                <td className="py-3 px-4 text-sm text-slate-600">{quote.date}</td>
+                                                <td className="py-3 px-4 text-sm text-slate-600">
+                                                    {quote.client?.name || 'N/A'}
+                                                </td>
+                                                <td className="py-3 px-4 text-sm text-right font-semibold text-slate-800">
+                                                    ${subtotal.toFixed(2)}
+                                                </td>
+                                                <td className="py-3 px-4 text-center">
+                                                    <select
+                                                        value={quote.status || 'borrador'}
+                                                        onChange={(e) => onUpdateStatus(quote.id, e.target.value)}
+                                                        className={`px-3 py-1 rounded-full text-xs font-semibold border-0 cursor-pointer ${
+                                                            quote.status === 'pagado' ? 'bg-green-100 text-green-700' :
+                                                            quote.status === 'enviado' ? 'bg-blue-100 text-blue-700' :
+                                                            'bg-gray-100 text-gray-700'
+                                                        }`}
+                                                    >
+                                                        <option value="borrador">📝 Borrador</option>
+                                                        <option value="enviado">→ Enviado</option>
+                                                        <option value="pagado">✓ Pagado</option>
+                                                    </select>
+                                                </td>
+                                                <td className="py-3 px-4">
+                                                    <div className="flex justify-center space-x-2">
+                                                        <button
+                                                            onClick={() => onViewQuote(quote)}
+                                                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                                                            title="Ver/Editar"
+                                                        >
+                                                            <Icons.Edit2 className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => onDeleteQuote(quote.id)}
+                                                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                                                            title="Eliminar"
+                                                        >
+                                                            <Icons.Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                            
+                            {filteredQuotes.length === 0 && (
+                                <div className="text-center py-12 text-slate-500">
+                                    No hay presupuestos en este período
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Client Search Component (Autocomplete)
+        function ClientSearch({ clients, selectedClient, onSelect, onNewClient }) {
+            const [searchTerm, setSearchTerm] = useState('');
+            const [isOpen, setIsOpen] = useState(false);
+            const [highlightedIndex, setHighlightedIndex] = useState(0);
+            const searchRef = React.useRef(null);
+
+            // Filtrar clientes según búsqueda
+            const filteredClients = clients.filter(client => {
+                const searchLower = searchTerm.toLowerCase();
+                return (
+                    client.name?.toLowerCase().includes(searchLower) ||
+                    client.rif?.toLowerCase().includes(searchLower) ||
+                    client.email?.toLowerCase().includes(searchLower)
+                );
+            });
+
+            // Cerrar dropdown al hacer clic fuera
+            React.useEffect(() => {
+                const handleClickOutside = (event) => {
+                    if (searchRef.current && !searchRef.current.contains(event.target)) {
+                        setIsOpen(false);
+                    }
+                };
+                document.addEventListener('mousedown', handleClickOutside);
+                return () => document.removeEventListener('mousedown', handleClickOutside);
+            }, []);
+
+            // Manejar teclas de navegación
+            const handleKeyDown = (e) => {
+                if (!isOpen) {
+                    if (e.key === 'ArrowDown' || e.key === 'Enter') {
+                        setIsOpen(true);
+                        e.preventDefault();
+                    }
+                    return;
+                }
+
+                switch (e.key) {
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        setHighlightedIndex(prev => 
+                            prev < filteredClients.length - 1 ? prev + 1 : prev
+                        );
+                        break;
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        setHighlightedIndex(prev => prev > 0 ? prev - 1 : 0);
+                        break;
+                    case 'Enter':
+                        e.preventDefault();
+                        if (filteredClients[highlightedIndex]) {
+                            handleSelect(filteredClients[highlightedIndex]);
+                        }
+                        break;
+                    case 'Escape':
+                        setIsOpen(false);
+                        break;
+                }
+            };
+
+            const handleSelect = (client) => {
+                onSelect(client);
+                setSearchTerm('');
+                setIsOpen(false);
+                setHighlightedIndex(0);
+            };
+
+            const displayValue = selectedClient 
+                ? `${selectedClient.name}${selectedClient.rif ? ` - ${selectedClient.rif}` : ''}`
+                : '';
+
+            return (
+                <div className="mb-6">
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">Cliente</label>
+                    <div className="flex gap-2">
+                        <div ref={searchRef} className="flex-1 relative">
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    value={isOpen ? searchTerm : displayValue}
+                                    onChange={(e) => {
+                                        setSearchTerm(e.target.value);
+                                        setIsOpen(true);
+                                        setHighlightedIndex(0);
+                                    }}
+                                    onFocus={() => setIsOpen(true)}
+                                    onKeyDown={handleKeyDown}
+                                    placeholder="Buscar o seleccionar cliente..."
+                                    className="w-full px-4 py-2 pr-10 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setIsOpen(!isOpen)}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
+                                    </svg>
+                                </button>
+                                {selectedClient && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            onSelect(null);
+                                            setSearchTerm('');
+                                        }}
+                                        className="absolute right-9 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-red-600"
+                                        title="Limpiar selección"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+                                        </svg>
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Dropdown de resultados */}
+                            {isOpen && (
+                                <div className="absolute z-50 w-full mt-1 bg-white border border-slate-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                    {filteredClients.length > 0 ? (
+                                        filteredClients.map((client, index) => (
+                                            <button
+                                                key={client.id}
+                                                type="button"
+                                                onClick={() => handleSelect(client)}
+                                                className={`w-full text-left px-4 py-2 hover:bg-blue-50 transition-colors ${
+                                                    index === highlightedIndex ? 'bg-blue-50' : ''
+                                                }`}
+                                            >
+                                                <div className="font-semibold text-slate-800">{client.name}</div>
+                                                {client.rif && (
+                                                    <div className="text-sm text-slate-600">RIF: {client.rif}</div>
+                                                )}
+                                                {client.email && (
+                                                    <div className="text-xs text-slate-500">{client.email}</div>
+                                                )}
+                                            </button>
+                                        ))
+                                    ) : (
+                                        <div className="px-4 py-3 text-sm text-slate-500 text-center">
+                                            No se encontraron clientes
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                        
+                        <button
+                            type="button"
+                            onClick={onNewClient}
+                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center space-x-2 whitespace-nowrap"
+                            title="Crear nuevo cliente"
+                        >
+                            <Icons.Plus className="w-5 h-5" />
+                            <span>Nuevo Cliente</span>
+                        </button>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                        {selectedClient 
+                            ? `✓ Cliente seleccionado: ${selectedClient.name}` 
+                            : 'Escribe para buscar o haz clic para ver todos los clientes'}
+                    </p>
+                </div>
+            );
+        }
+
+        // Quote Form Component (continuará con todo el código del formulario...)
+        function QuoteForm({ quote, clients, config, onSave, onCancel, onGoToClients }) {
+            // Función para formatear fecha a dd/mm/yyyy
+            const formatDateToDDMMYYYY = (date) => {
+                const d = new Date(date);
+                const day = String(d.getDate()).padStart(2, '0');
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const year = d.getFullYear();
+                return `${day}/${month}/${year}`;
+            };
+            
+            // Función para convertir dd/mm/yyyy a yyyy-mm-dd (para el input type="date")
+            const ddmmyyyyToISO = (dateStr) => {
+                if (!dateStr) return '';
+                if (dateStr.includes('-')) return dateStr; // Ya está en formato ISO
+                const [day, month, year] = dateStr.split('/');
+                return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            };
+            
+            // Función para convertir yyyy-mm-dd a dd/mm/yyyy (para guardar)
+            const isoToDDMMYYYY = (isoDate) => {
+                if (!isoDate) return '';
+                if (isoDate.includes('/')) return isoDate; // Ya está en formato dd/mm/yyyy
+                const [year, month, day] = isoDate.split('-');
+                return `${day}/${month}/${year}`;
+            };
+            
+            const [formData, setFormData] = useState(
+                quote || {
+                    number: '',
+                    date: formatDateToDDMMYYYY(new Date()),
+                    seller: '',
+                    client: null,
+                    items: [{ quantity: 1, description: '', unitPrice: 0 }],
+                    includeIva: false,
+                    paymentConditions: 'Transferencia - Pago Móvil',
+                    validUntil: '',
+                    notes: '',
+                    status: 'borrador' // Estado por defecto
+                }
+            );
+
+            // Generar número secuencial consultando Firebase
+            // IMPORTANTE: Requiere índice compuesto en Firebase Firestore
+            // Si da error la primera vez, Firebase te dará un link para crear el índice automáticamente
+            // Índice necesario: Collection: quotes, Fields: number (Ascending), __name__ (Ascending)
+            useEffect(() => {
+                const generateSequentialNumber = async () => {
+                    if (!formData.number) {
+                        const year = new Date().getFullYear();
+                        
+                        try {
+                            // Buscar el último presupuesto del año actual
+                            const snapshot = await db.collection('quotes')
+                                .where('number', '>=', `${year}-`)
+                                .where('number', '<', `${year + 1}-`)
+                                .orderBy('number', 'desc')
+                                .limit(1)
+                                .get();
+                            
+                            let nextNumber = 1;
+                            
+                            if (!snapshot.empty) {
+                                const lastQuote = snapshot.docs[0].data();
+                                const lastNumber = lastQuote.number.split('-')[1];
+                                nextNumber = parseInt(lastNumber) + 1;
+                            }
+                            
+                            const paddedNumber = nextNumber.toString().padStart(3, '0');
+                            setFormData(prev => ({ ...prev, number: `${year}-${paddedNumber}` }));
+                        } catch (error) {
+                            console.error('Error generando número secuencial:', error);
+                            // Si falla (probablemente falta índice), mostrar link en consola
+                            if (error.message.includes('index')) {
+                                console.warn('⚠️ Necesitas crear un índice en Firebase. Revisa la consola del navegador para el link.');
+                            }
+                            // Fallback a número aleatorio si hay error
+                            const randomNum = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+                            setFormData(prev => ({ ...prev, number: `${year}-${randomNum}` }));
+                        }
+                    }
+                };
+                
+                generateSequentialNumber();
+            }, []);
+
+            // Limpiar storage temporal cuando se seleccione un cliente
+            useEffect(() => {
+                if (formData.client && sessionStorage.getItem('tempQuote')) {
+                    sessionStorage.removeItem('tempQuote');
+                }
+            }, [formData.client]);
+
+            const addItem = () => {
+                setFormData(prev => ({
+                    ...prev,
+                    items: [...prev.items, { quantity: 1, description: '', unitPrice: 0 }]
+                }));
+            };
+
+            const removeItem = (index) => {
+                setFormData(prev => ({
+                    ...prev,
+                    items: prev.items.filter((_, i) => i !== index)
+                }));
+            };
+
+            const updateItem = (index, field, value) => {
+                setFormData(prev => ({
+                    ...prev,
+                    items: prev.items.map((item, i) =>
+                        i === index ? { ...item, [field]: value } : item
+                    )
+                }));
+            };
+
+            const calculateSubtotal = () => {
+                return formData.items.reduce((sum, item) => {
+                    return sum + ((item.quantity || 0) * (item.unitPrice || 0));
+                }, 0);
+            };
+
+            const calculateTotal = () => {
+                const subtotal = calculateSubtotal();
+                return formData.includeIva ? subtotal * 1.16 : subtotal;
+            };
+
+            const handleSave = async () => {
+                if (!formData.client) {
+                    alert('Por favor selecciona un cliente');
+                    return;
+                }
+                await onSave(formData);
+            };
+
+            // NUEVA FUNCIÓN: Enviar presupuesto por email con EmailJS
+            const sendEmailWithPDF = async () => {
+                if (!formData.client || !formData.client.email) {
+                    alert('❌ El cliente no tiene email registrado');
+                    return;
+                }
+
+                if (!quote) {
+                    alert('⚠️ Debes guardar el presupuesto antes de enviarlo');
+                    return;
+                }
+
+                const confirmSend = window.confirm(
+                    `¿Enviar presupuesto ${formData.number} a ${formData.client.email}?`
+                );
+                
+                if (!confirmSend) return;
+
+                try {
+                    // Mostrar indicador de carga
+                    const originalButton = event.target;
+                    originalButton.disabled = true;
+                    originalButton.innerHTML = '<svg class="animate-spin h-5 w-5 mr-2 inline" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Enviando...';
+
+                    // Calcular totales para el email
+                    const subtotal = calculateSubtotal();
+                    const total = calculateTotal();
+
+                    // Inicializar EmailJS
+                    emailjs.init('a1HvREFCCu6s4gwt_'); // Tu Public Key (corregido)
+
+                    // Preparar datos del email - Asegurar que todos sean strings
+                    const templateParams = {
+                        to_email: String(formData.client.email || ''),
+                        client_name: String(formData.client.name || ''),
+                        quote_number: String(formData.number || ''),
+                        quote_date: String(formData.date || ''),
+                        subtotal: String(subtotal.toFixed(2)),
+                        total: String(total.toFixed(2)),
+                        payment_conditions: String(formData.paymentConditions || 'A convenir'),
+                        seller: String(formData.seller || 'Te lo Imprimo'),
+                        company_email: String(config?.email || 'teloimprimooficial@gmail.com')
+                    };
+
+                    // Enviar email usando EmailJS
+                    const response = await emailjs.send(
+                        'service_u32o7yh',  // Tu Service ID
+                        'template_vmpe01h', // Tu Template ID (corregido)
+                        templateParams
+                    );
+
+                    // Restaurar botón
+                    originalButton.disabled = false;
+                    originalButton.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg><span>Enviar por Email</span>';
+
+                    if (response.status === 200) {
+                        // Actualizar estado del presupuesto a "enviado"
+                        await db.collection('quotes').doc(quote.id).update({
+                            status: 'enviado',
+                            lastSentDate: new Date().toISOString()
+                        });
+
+                        alert(`✅ ¡Email enviado exitosamente!\n\n📧 Enviado a: ${formData.client.email}\n📄 Presupuesto: ${formData.number}\n\n✨ Estado actualizado a "Enviado"`);
+                    }
+
+                } catch (error) {
+                    console.error('Error al enviar email:', error);
+                    
+                    // Restaurar botón en caso de error
+                    if (event.target) {
+                        event.target.disabled = false;
+                        event.target.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg><span>Enviar por Email</span>';
+                    }
+                    
+                    alert(`❌ Error al enviar el email\n\n${error.text || error.message || 'Intenta de nuevo'}`);
+                }
+            };
+
+            const generatePDF = async () => {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                
+                const pageWidth = doc.internal.pageSize.getWidth();
+                const pageHeight = doc.internal.pageSize.getHeight();
+                const margin = 15;
+                let y = 15;
+
+                // ===== HEADER ARCOÍRIS =====
+                const headerHeight = 35;
+                const colorBands = [
+                    [139, 92, 246],   // Morado
+                    [59, 130, 246],   // Azul
+                    [16, 185, 129],   // Verde
+                    [245, 158, 11],   // Naranja
+                    [251, 191, 36]    // Amarillo
+                ];
+                
+                const bandWidth = pageWidth / colorBands.length;
+                colorBands.forEach((color, i) => {
+                    const gradient = doc.setFillColor(color[0], color[1], color[2]);
+                    doc.rect(i * bandWidth, 0, bandWidth, headerHeight, 'F');
+                });
+
+                // Logo (si existe)
+                if (config.logo) {
+                    try {
+                        doc.addImage(config.logo, 'PNG', margin, 8, 25, 25);
+                    } catch (e) {
+                        console.error('Error al agregar logo:', e);
+                    }
+                }
+
+                // Texto del header (dentro del arcoíris)
+                doc.setTextColor(255, 255, 255);
+                doc.setFontSize(9);
+                doc.setFont(undefined, 'bold');
+                
+                // Servicios a la derecha del logo
+                const services = [
+                    'GRABADO LASER    PENDONES',
+                    'BANNER    PRINGRAF PAF',
+                    'ETIQUETAS    SUBLIMACION',
+                    'IMPRESION EN VINIL'
+                ];
+                
+                let serviceY = 12;
+                services.forEach(service => {
+                    doc.text(service, margin + 35, serviceY);
+                    serviceY += 4;
+                });
+
+                // Slogan abajo a la derecha
+                doc.setFontSize(8);
+                doc.setFont(undefined, 'italic');
+                doc.text('Te lo imaginas • Nosotros lo hacemos', pageWidth - margin - 5, headerHeight - 5, { align: 'right' });
+
+                y = headerHeight + 5;
+
+                // ===== INFORMACIÓN DE LA EMPRESA (debajo del header) =====
+                doc.setTextColor(120, 120, 120);
+                doc.setFontSize(8);
+                doc.setFont(undefined, 'normal');
+                const companyInfo = `RIF: ${config.rif} | ${config.email} | ${config.website}`;
+                doc.text(companyInfo, pageWidth / 2, y, { align: 'center' });
+                
+                y += 10;
+
+                // ===== TÍTULO DEL PRESUPUESTO =====
+                doc.setTextColor(59, 130, 246);
+                doc.setFontSize(16);
+                doc.setFont(undefined, 'bold');
+                doc.text(`Presupuesto ${formData.number}`, margin, y);
+                
+                y += 8;
+                doc.setTextColor(0, 0, 0);
+                doc.setFontSize(9);
+                doc.setFont(undefined, 'normal');
+                doc.text(`Fecha: ${formData.date}`, margin, y);
+                doc.text(`Vendedor: ${formData.seller}`, margin + 50, y);
+
+                y += 10;
+
+                // ===== INFORMACIÓN DEL CLIENTE (con borde azul) =====
+                const clientBoxY = y;
+                const clientBoxHeight = 30;
+                
+                // Borde azul a la izquierda
+                doc.setDrawColor(59, 130, 246);
+                doc.setLineWidth(2);
+                doc.line(margin, clientBoxY, margin, clientBoxY + clientBoxHeight);
+                
+                // Fondo gris muy claro
+                doc.setFillColor(249, 250, 251);
+                doc.rect(margin + 2, clientBoxY, pageWidth - 2 * margin - 2, clientBoxHeight, 'F');
+
+                // Contenido del cliente
+                doc.setFontSize(9);
+                doc.setFont(undefined, 'bold');
+                doc.setTextColor(0, 0, 0);
+                doc.text('Cliente', margin + 5, clientBoxY + 5);
+                
+                doc.setFont(undefined, 'bold');
+                doc.setFontSize(10);
+                doc.text(formData.client.name, margin + 5, clientBoxY + 11);
+                
+                doc.setFont(undefined, 'normal');
+                doc.setFontSize(8);
+                let clientY = clientBoxY + 16;
+                if (formData.client.rif) {
+                    doc.text(`RIF/CI: ${formData.client.rif}`, margin + 5, clientY);
+                    clientY += 4;
+                }
+                if (formData.client.email) {
+                    doc.text(`Email: ${formData.client.email}`, margin + 5, clientY);
+                    clientY += 4;
+                }
+                if (formData.client.phone) {
+                    doc.text(`Tel: ${formData.client.phone}`, margin + 5, clientY);
+                    clientY += 4;
+                }
+                if (formData.client.address) {
+                    doc.text(`Dir: ${formData.client.address}`, margin + 5, clientY);
+                }
+
+                y = clientBoxY + clientBoxHeight + 8;
+
+                // ===== CONDICIONES (si existen) =====
+                if (formData.paymentConditions) {
+                    doc.setFontSize(8);
+                    doc.setFont(undefined, 'bold');
+                    doc.text(`Condiciones: `, margin, y);
+                    doc.setFont(undefined, 'normal');
+                    doc.text(formData.paymentConditions, margin + 22, y);
+                    y += 8;
+                }
+
+                // ===== TABLA DE PRODUCTOS =====
+                // Header de la tabla (fondo oscuro)
+                doc.setFillColor(52, 73, 94);
+                doc.rect(margin, y, pageWidth - 2 * margin, 8, 'F');
+                
+                doc.setTextColor(255, 255, 255);
+                doc.setFontSize(9);
+                doc.setFont(undefined, 'bold');
+                doc.text('Cant', margin + 3, y + 5);
+                doc.text('Descripción', margin + 20, y + 5);
+                doc.text('Precio UND', pageWidth - margin - 45, y + 5);
+                doc.text('Total', pageWidth - margin - 15, y + 5);
+                
+                y += 10;
+
+                // Items de la tabla
+                doc.setTextColor(0, 0, 0);
+                doc.setFontSize(9);
+                doc.setFont(undefined, 'normal');
+                
+                formData.items.forEach((item, index) => {
+                    // Alternar color de fondo
+                    if (index % 2 === 0) {
+                        doc.setFillColor(249, 250, 251);
+                        doc.rect(margin, y - 4, pageWidth - 2 * margin, 8, 'F');
+                    }
+                    
+                    const total = (item.quantity || 0) * (item.unitPrice || 0);
+                    doc.text(String(item.quantity), margin + 3, y);
+                    
+                    // Descripción con wrapping si es muy larga
+                    const maxWidth = pageWidth - margin - 80;
+                    const lines = doc.splitTextToSize(item.description, maxWidth);
+                    doc.text(lines, margin + 20, y);
+                    
+                    doc.text(`$${(item.unitPrice || 0).toFixed(2)}`, pageWidth - margin - 45, y);
+                    doc.text(`$${total.toFixed(2)}`, pageWidth - margin - 15, y, { align: 'right' });
+                    
+                    y += Math.max(8, lines.length * 5);
+                });
+
+                y += 5;
+
+                // ===== TOTALES =====
+                const subtotal = calculateSubtotal();
+                const iva = formData.includeIva ? subtotal * 0.16 : 0;
+                const total = subtotal + iva;
+
+                doc.setFontSize(9);
+                doc.setFont(undefined, 'normal');
+                
+                // Línea separadora
+                doc.setDrawColor(200, 200, 200);
+                doc.setLineWidth(0.5);
+                doc.line(pageWidth - margin - 60, y, pageWidth - margin, y);
+                y += 5;
+
+                doc.text('Subtotal:', pageWidth - margin - 45, y);
+                doc.text(`$${subtotal.toFixed(2)}`, pageWidth - margin - 15, y, { align: 'right' });
+                y += 5;
+
+                if (formData.includeIva) {
+                    doc.text('IVA 16%:', pageWidth - margin - 45, y);
+                    doc.text(`$${iva.toFixed(2)}`, pageWidth - margin - 15, y, { align: 'right' });
+                    
+                    // Línea antes del total
+                    y += 3;
+                    doc.setDrawColor(200, 200, 200);
+                    doc.line(pageWidth - margin - 60, y, pageWidth - margin, y);
+                    y += 5;
+                }
+
+                doc.setFont(undefined, 'bold');
+                doc.setFontSize(11);
+                doc.setTextColor(59, 130, 246);
+                doc.text('Total:', pageWidth - margin - 45, y);
+                doc.text(`$${total.toFixed(2)}`, pageWidth - margin - 15, y, { align: 'right' });
+
+                y += 10;
+
+                // ===== NOTAS (con fondo amarillo claro) =====
+                if (formData.notes || formData.validUntil) {
+                    doc.setFillColor(254, 252, 232);
+                    doc.setDrawColor(251, 191, 36);
+                    doc.setLineWidth(0.5);
+                    
+                    const notesHeight = 15;
+                    doc.rect(margin, y, pageWidth - 2 * margin, notesHeight, 'FD');
+                    
+                    doc.setFontSize(8);
+                    doc.setTextColor(0, 0, 0);
+                    doc.setFont(undefined, 'bold');
+                    
+                    let noteY = y + 5;
+                    if (formData.notes) {
+                        doc.text(`Nota: `, margin + 3, noteY);
+                        doc.setFont(undefined, 'normal');
+                        doc.text(formData.notes, margin + 12, noteY);
+                        noteY += 4;
+                    }
+                    
+                    if (formData.validUntil) {
+                        doc.setFont(undefined, 'bold');
+                        doc.text(`Válido hasta: `, margin + 3, noteY);
+                        doc.setFont(undefined, 'normal');
+                        doc.text(formData.validUntil, margin + 25, noteY);
+                    }
+                    
+                    y += notesHeight + 5;
+                }
+
+                // ===== DATOS DE PAGO (al final) =====
+                y += 5;
+                doc.setFontSize(9);
+                doc.setFont(undefined, 'bold');
+                doc.setTextColor(0, 0, 0);
+                doc.text('Datos de Pago', pageWidth / 2, y, { align: 'center' });
+                y += 5;
+                doc.setFontSize(8);
+                doc.setFont(undefined, 'normal');
+                doc.text(`Pago Móvil: 0414-2593085 | CI: 16676859 | Bancamiga/Banesco`, pageWidth / 2, y, { align: 'center' });
+
+                // Guardar con nombre correcto
+                doc.save(`Presupuesto-${formData.number}.pdf`);
+            };
+
+            return (
+                <div className="max-w-5xl mx-auto p-6">
+                    <div className="bg-white rounded-xl shadow-lg p-6">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-2xl font-bold text-slate-800">
+                                {quote ? 'Editar Presupuesto' : 'Nuevo Presupuesto'}
+                            </h2>
+                            <button
+                                onClick={onCancel}
+                                className="text-slate-600 hover:text-slate-900"
+                            >
+                                <Icons.ArrowLeft className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                    Número de Presupuesto
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.number}
+                                    onChange={(e) => setFormData({ ...formData, number: e.target.value })}
+                                    className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">Fecha</label>
+                                <input
+                                    type="date"
+                                    value={ddmmyyyyToISO(formData.date)}
+                                    onChange={(e) => setFormData({ ...formData, date: isoToDDMMYYYY(e.target.value) })}
+                                    className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">Vendedor</label>
+                                <input
+                                    type="text"
+                                    value={formData.seller}
+                                    onChange={(e) => setFormData({ ...formData, seller: e.target.value })}
+                                    className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                                    placeholder="Nombre del vendedor"
+                                />
+                            </div>
+                        </div>
+
+                        <ClientSearch
+                            clients={clients}
+                            selectedClient={formData.client}
+                            onSelect={(client) => setFormData({ ...formData, client: client })}
+                            onNewClient={() => {
+                                if (onGoToClients) {
+                                    onGoToClients(formData);
+                                }
+                            }}
+                        />
+
+                        <div className="mb-6">
+                            <div className="flex justify-between items-center mb-4">
+                                <label className="block text-sm font-semibold text-slate-700">
+                                    Productos/Servicios
+                                </label>
+                                <button
+                                    onClick={addItem}
+                                    className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                >
+                                    <Icons.Plus className="w-4 h-4" />
+                                    <span>Agregar Item</span>
+                                </button>
+                            </div>
+
+                            {formData.items.map((item, index) => (
+                                <div key={index} className="flex gap-2 mb-3">
+                                    <input
+                                        type="number"
+                                        value={item.quantity}
+                                        onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                                        className="w-20 px-3 py-2 border border-slate-300 rounded-lg"
+                                        placeholder="Cant."
+                                    />
+                                    <input
+                                        type="text"
+                                        value={item.description}
+                                        onChange={(e) => updateItem(index, 'description', e.target.value)}
+                                        className="flex-1 px-4 py-2 border border-slate-300 rounded-lg"
+                                        placeholder="Descripción"
+                                    />
+                                    <input
+                                        type="number"
+                                        value={item.unitPrice}
+                                        onChange={(e) => updateItem(index, 'unitPrice', parseFloat(e.target.value) || 0)}
+                                        className="w-32 px-3 py-2 border border-slate-300 rounded-lg"
+                                        placeholder="Precio"
+                                        step="0.01"
+                                    />
+                                    <div className="w-32 px-3 py-2 bg-slate-100 rounded-lg flex items-center justify-end">
+                                        ${((item.quantity || 0) * (item.unitPrice || 0)).toFixed(2)}
+                                    </div>
+                                    {formData.items.length > 1 && (
+                                        <button
+                                            onClick={() => removeItem(index)}
+                                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                                        >
+                                            <Icons.Trash2 className="w-5 h-5" />
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="bg-slate-50 rounded-lg p-4 mb-6">
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-slate-700">Subtotal:</span>
+                                <span className="font-semibold">${calculateSubtotal().toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between items-center mb-2">
+                                <label className="flex items-center space-x-2">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.includeIva}
+                                        onChange={(e) => setFormData({ ...formData, includeIva: e.target.checked })}
+                                        className="rounded"
+                                    />
+                                    <span className="text-slate-700">IVA (16%):</span>
+                                </label>
+                                <span className="font-semibold">
+                                    ${formData.includeIva ? (calculateSubtotal() * 0.16).toFixed(2) : '0.00'}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center pt-2 border-t border-slate-300">
+                                <span className="text-lg font-bold text-slate-800">Total:</span>
+                                <span className="text-lg font-bold text-blue-600">${calculateTotal().toFixed(2)}</span>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                    Condiciones de Pago
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.paymentConditions}
+                                    onChange={(e) => setFormData({ ...formData, paymentConditions: e.target.value })}
+                                    className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                    Válido hasta
+                                </label>
+                                <input
+                                    type="date"
+                                    value={ddmmyyyyToISO(formData.validUntil)}
+                                    onChange={(e) => setFormData({ ...formData, validUntil: isoToDDMMYYYY(e.target.value) })}
+                                    className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="mb-6">
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">Notas</label>
+                            <textarea
+                                value={formData.notes}
+                                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                                className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                                rows="3"
+                                placeholder="Notas adicionales..."
+                            />
+                        </div>
+
+                        <div className="flex justify-end space-x-4">
+                            <button
+                                onClick={onCancel}
+                                className="px-6 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleSave}
+                                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center space-x-2"
+                            >
+                                <Icons.Save className="w-5 h-5" />
+                                <span>Guardar</span>
+                            </button>
+                            {quote && (
+                                <>
+                                    <button
+                                        onClick={generatePDF}
+                                        className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center space-x-2"
+                                    >
+                                        <Icons.Download className="w-5 h-5" />
+                                        <span>Generar PDF</span>
+                                    </button>
+                                    <button
+                                        onClick={sendEmailWithPDF}
+                                        className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center space-x-2"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                        </svg>
+                                        <span>Enviar por Email</span>
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Clients Manager Component
+        function ClientsManager({ clients, onSave, onDelete }) {
+            const [editingClient, setEditingClient] = useState(null);
+            const [showForm, setShowForm] = useState(false);
+            const [searchTerm, setSearchTerm] = useState('');
+            const [formData, setFormData] = useState({
+                name: '',
+                rif: '',
+                email: '',
+                phone: '',
+                address: ''
+            });
+
+            // Filtrar clientes según búsqueda
+            const filteredClients = clients.filter(client => {
+                const searchLower = searchTerm.toLowerCase();
+                return (
+                    client.name?.toLowerCase().includes(searchLower) ||
+                    client.rif?.toLowerCase().includes(searchLower) ||
+                    client.email?.toLowerCase().includes(searchLower) ||
+                    client.phone?.toLowerCase().includes(searchLower)
+                );
+            });
+
+            const handleEdit = (client) => {
+                setFormData(client);
+                setEditingClient(client);
+                setShowForm(true);
+            };
+
+            const handleNew = () => {
+                setFormData({
+                    name: '',
+                    rif: '',
+                    email: '',
+                    phone: '',
+                    address: ''
+                });
+                setEditingClient(null);
+                setShowForm(true);
+            };
+
+            const handleSave = async () => {
+                const savedClient = await onSave(formData);
+                setShowForm(false);
+                setEditingClient(null);
+                
+                // Si hay un presupuesto temporal guardado, regresar a él
+                const tempQuote = sessionStorage.getItem('tempQuote');
+                if (tempQuote) {
+                    sessionStorage.removeItem('tempQuote');
+                    // Esperar un momento para que el cliente se guarde en Firebase
+                    setTimeout(() => {
+                        alert('Cliente guardado. Selecciónalo en el presupuesto.');
+                    }, 500);
+                }
+            };
+
+            if (showForm) {
+                return (
+                    <div className="max-w-2xl mx-auto p-6">
+                        <div className="bg-white rounded-xl shadow-lg p-6">
+                            <h2 className="text-2xl font-bold text-slate-800 mb-6">
+                                {editingClient ? 'Editar Cliente' : 'Nuevo Cliente'}
+                            </h2>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                        Nombre *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={formData.name}
+                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                        className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">RIF</label>
+                                    <input
+                                        type="text"
+                                        value={formData.rif}
+                                        onChange={(e) => setFormData({ ...formData, rif: e.target.value })}
+                                        className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">Email</label>
+                                    <input
+                                        type="email"
+                                        value={formData.email}
+                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                        className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">Teléfono</label>
+                                    <input
+                                        type="tel"
+                                        value={formData.phone}
+                                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                        className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">Dirección</label>
+                                    <textarea
+                                        value={formData.address}
+                                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                                        className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                                        rows="3"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end space-x-4 mt-6">
+                                <button
+                                    onClick={() => setShowForm(false)}
+                                    className="px-6 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleSave}
+                                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                >
+                                    Guardar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="max-w-6xl mx-auto p-6">
+                    <div className="flex justify-between items-center mb-6">
+                        <div>
+                            <h2 className="text-2xl font-bold text-slate-800">Clientes</h2>
+                            {sessionStorage.getItem('tempQuote') && (
+                                <p className="text-sm text-blue-600 mt-1">
+                                    💡 Crea el cliente y luego vuelve al presupuesto para seleccionarlo
+                                </p>
+                            )}
+                        </div>
+                        <div className="flex gap-2">
+                            {sessionStorage.getItem('tempQuote') && (
+                                <button
+                                    onClick={() => {
+                                        window.location.reload(); // Recargar para volver al presupuesto
+                                    }}
+                                    className="flex items-center space-x-2 px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700"
+                                >
+                                    <Icons.ArrowLeft className="w-5 h-5" />
+                                    <span>Volver al Presupuesto</span>
+                                </button>
+                            )}
+                            <button
+                                onClick={handleNew}
+                                className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                            >
+                                <Icons.Plus className="w-5 h-5" />
+                                <span>Nuevo Cliente</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Campo de búsqueda */}
+                    <div className="mb-6">
+                        <div className="relative">
+                            <input
+                                type="text"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                placeholder="🔍 Buscar cliente por nombre, RIF, email o teléfono..."
+                                className="w-full px-4 py-3 pr-10 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+                            />
+                            {searchTerm && (
+                                <button
+                                    onClick={() => setSearchTerm('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                </button>
+                            )}
+                        </div>
+                        {searchTerm && (
+                            <p className="text-sm text-slate-600 mt-2">
+                                {filteredClients.length} cliente{filteredClients.length !== 1 ? 's' : ''} encontrado{filteredClients.length !== 1 ? 's' : ''}
+                            </p>
+                        )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {filteredClients.map(client => (
+                            <div key={client.id} className="bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow">
+                                <div className="flex justify-between items-start mb-3">
+                                    <div>
+                                        <h3 className="font-bold text-lg text-slate-800">{client.name}</h3>
+                                        <p className="text-sm text-slate-600">{client.rif}</p>
+                                    </div>
+                                    <div className="flex space-x-2">
+                                        <button
+                                            onClick={() => handleEdit(client)}
+                                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                                        >
+                                            <Icons.Edit2 className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => onDelete(client.id)}
+                                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                                        >
+                                            <Icons.Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                                {client.email && (
+                                    <p className="text-sm text-slate-600 mb-1">📧 {client.email}</p>
+                                )}
+                                {client.phone && (
+                                    <p className="text-sm text-slate-600 mb-1">📱 {client.phone}</p>
+                                )}
+                                {client.address && (
+                                    <p className="text-sm text-slate-600">📍 {client.address}</p>
+                                )}
+                            </div>
+                        ))}
+
+                        {filteredClients.length === 0 && (
+                            <div className="col-span-full text-center py-12 text-slate-500">
+                                {searchTerm 
+                                    ? `No se encontraron clientes con "${searchTerm}"`
+                                    : 'No hay clientes registrados. Crea tu primer cliente.'}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // Render App
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
