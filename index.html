@@ -928,6 +928,7 @@
                             <QuoteForm
                                 quote={currentQuote}
                                 clients={clients}
+                                quotes={quotes}
                                 config={config}
                                 onSave={async (quote) => { await saveQuote(quote); setView('quotes'); }}
                                 onCancel={() => setView('quotes')}
@@ -1840,7 +1841,7 @@
         }
 
         // Quote Form Component (continuará con todo el código del formulario...)
-        function QuoteForm({ quote, clients, config, onSave, onCancel, onGoToClients }) {
+        function QuoteForm({ quote, clients, config, quotes = [], onSave, onCancel, onGoToClients }) {
             // Función para formatear fecha a dd/mm/yyyy
             const formatDateToDDMMYYYY = (date) => {
                 const d = new Date(date);
@@ -1866,9 +1867,19 @@
                 return `${day}/${month}/${year}`;
             };
             
+            const generateNumber = () => {
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const prefix = `${year}-${month}${day}`;
+                const count = quotes.filter(q => (q.number || '').startsWith(prefix)).length;
+                return `${prefix}${count + 1}`;
+            };
+
             const [formData, setFormData] = useState(
                 quote || {
-                    number: '',
+                    number: generateNumber(),
                     date: formatDateToDDMMYYYY(new Date()),
                     deliveryDate: '',
                     seller: '',
@@ -1882,49 +1893,6 @@
                 }
             );
 
-            // Generar número secuencial consultando Firebase
-            // IMPORTANTE: Requiere índice compuesto en Firebase Firestore
-            // Si da error la primera vez, Firebase te dará un link para crear el índice automáticamente
-            // Índice necesario: Collection: quotes, Fields: number (Ascending), __name__ (Ascending)
-            useEffect(() => {
-                const generateSequentialNumber = async () => {
-                    if (!formData.number) {
-                        const year = new Date().getFullYear();
-                        
-                        try {
-                            // Buscar el último presupuesto del año actual
-                            const snapshot = await db.collection('quotes')
-                                .where('number', '>=', `${year}-`)
-                                .where('number', '<', `${year + 1}-`)
-                                .orderBy('number', 'desc')
-                                .limit(1)
-                                .get();
-                            
-                            let nextNumber = 1;
-                            
-                            if (!snapshot.empty) {
-                                const lastQuote = snapshot.docs[0].data();
-                                const lastNumber = lastQuote.number.split('-')[1];
-                                nextNumber = parseInt(lastNumber) + 1;
-                            }
-                            
-                            const paddedNumber = nextNumber.toString().padStart(3, '0');
-                            setFormData(prev => ({ ...prev, number: `${year}-${paddedNumber}` }));
-                        } catch (error) {
-                            console.error('Error generando número secuencial:', error);
-                            // Si falla (probablemente falta índice), mostrar link en consola
-                            if (error.message.includes('index')) {
-                                console.warn('⚠️ Necesitas crear un índice en Firebase. Revisa la consola del navegador para el link.');
-                            }
-                            // Fallback a número aleatorio si hay error
-                            const randomNum = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-                            setFormData(prev => ({ ...prev, number: `${year}-${randomNum}` }));
-                        }
-                    }
-                };
-                
-                generateSequentialNumber();
-            }, []);
 
             // Limpiar storage temporal cuando se seleccione un cliente
             useEffect(() => {
