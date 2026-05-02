@@ -818,15 +818,46 @@
             };
 
             const saveQuote = async (quote) => {
-                // Agregar estado por defecto si no existe
                 if (!quote.status) {
                     quote.status = 'borrador';
                 }
-                
+
+                let quoteId = quote.id;
                 if (quote.id) {
                     await db.collection('quotes').doc(quote.id).update(quote);
                 } else {
-                    await db.collection('quotes').add(quote);
+                    const ref = await db.collection('quotes').add(quote);
+                    quoteId = ref.id;
+                }
+
+                // Sincronizar tarea de entrega
+                const taskRef = db.collection('tasks').doc(`delivery-${quoteId}`);
+                if (quote.deliveryDate) {
+                    const d = quote.deliveryDate;
+                    const isoDate = d.includes('/')
+                        ? (() => { const [day,month,year] = d.split('/'); return `${year}-${month.padStart(2,'0')}-${day.padStart(2,'0')}`; })()
+                        : d;
+                    const clientName = quote.client?.name;
+                    const taskTitle = `Entrega: ${quote.number}${clientName ? ' — ' + clientName : ''}`;
+                    const taskDoc = await taskRef.get();
+                    if (!taskDoc.exists) {
+                        await taskRef.set({
+                            title: taskTitle,
+                            dueDate: isoDate,
+                            status: 'pendiente',
+                            priority: 'normal',
+                            responsible: '',
+                            notes: `Presupuesto N° ${quote.number}`,
+                            quoteId,
+                            type: 'entrega',
+                            createdAt: new Date().toISOString()
+                        });
+                    } else {
+                        await taskRef.update({ title: taskTitle, dueDate: isoDate, notes: `Presupuesto N° ${quote.number}` });
+                    }
+                } else {
+                    const taskDoc = await taskRef.get();
+                    if (taskDoc.exists) await taskRef.delete();
                 }
             };
 
