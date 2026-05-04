@@ -2054,6 +2054,21 @@
                 await onSave(formData);
             };
 
+            // Comprime el logo antes de insertarlo en el PDF para evitar archivos pesados
+            const compressLogo = (dataUrl, maxPx = 300, quality = 0.82) => new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    const scale = Math.min(maxPx / img.width, maxPx / img.height, 1);
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.round(img.width * scale);
+                    canvas.height = Math.round(img.height * scale);
+                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                    resolve(canvas.toDataURL('image/jpeg', quality));
+                };
+                img.onerror = () => resolve(dataUrl);
+                img.src = dataUrl;
+            });
+
             // NUEVA FUNCIÓN: Enviar presupuesto por email con EmailJS
             const sendEmailWithPDF = async () => {
                 if (!formData.client || !formData.client.email) {
@@ -2141,32 +2156,26 @@
                 const margin = 15;
                 let y = 15;
 
-                // ===== HEADER ARCOÍRIS =====
+                // ===== HEADER SOBRIO =====
                 const headerHeight = 35;
-                const colorBands = [
-                    [139, 92, 246],   // Morado
-                    [59, 130, 246],   // Azul
-                    [16, 185, 129],   // Verde
-                    [245, 158, 11],   // Naranja
-                    [251, 191, 36]    // Amarillo
-                ];
-                
-                const bandWidth = pageWidth / colorBands.length;
-                colorBands.forEach((color, i) => {
-                    const gradient = doc.setFillColor(color[0], color[1], color[2]);
-                    doc.rect(i * bandWidth, 0, bandWidth, headerHeight, 'F');
-                });
+                // Fondo oscuro principal
+                doc.setFillColor(15, 23, 42);
+                doc.rect(0, 0, pageWidth, headerHeight, 'F');
+                // Línea de acento azul en la base
+                doc.setFillColor(59, 130, 246);
+                doc.rect(0, headerHeight - 2, pageWidth, 2, 'F');
 
-                // Logo (si existe)
+                // Logo (comprimido para evitar PDFs pesados)
                 if (config.logo) {
                     try {
-                        doc.addImage(config.logo, 'PNG', margin, 8, 25, 25);
+                        const logoData = await compressLogo(config.logo);
+                        doc.addImage(logoData, 'JPEG', margin, 5, 25, 25);
                     } catch (e) {
                         console.error('Error al agregar logo:', e);
                     }
                 }
 
-                // Texto del header (dentro del arcoíris)
+                // Texto del header
                 doc.setTextColor(255, 255, 255);
                 doc.setFontSize(9);
                 doc.setFont(undefined, 'bold');

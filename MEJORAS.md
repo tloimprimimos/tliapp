@@ -4,6 +4,8 @@
 - [x] Duplicar presupuesto (botón en tabla que clona con número nuevo)
 - [x] Eliminar tarea de entrega al borrar su presupuesto (bug)
 - [x] Toasts en vez de alert() del sistema
+- [x] PDF: header sobrio oscuro (reemplaza arcoíris multicolor)
+- [x] PDF: comprimir logo antes de insertar (reduce de ~60MB a <500KB)
 
 ## Alta prioridad
 - [ ] Historial de presupuestos por cliente (en vista de cliente)
