@@ -8,9 +8,9 @@
 - [x] PDF: comprimir logo antes de insertar (reduce de ~60MB a <500KB)
 
 ## Alta prioridad
-- [ ] Historial de presupuestos por cliente (en vista de cliente)
-- [ ] Confirmación antes de cambiar estado desde la tabla (evitar cambios accidentales)
-- [ ] Estado "cobrado" post-aceptado (cerrar ciclo de venta)
+- [x] Historial de presupuestos por cliente (en vista de cliente)
+- [x] Confirmación antes de cambiar estado desde la tabla (evitar cambios accidentales)
+- [x] Estado "cobrado" post-aceptado (cerrar ciclo de venta)
 
 ## Productividad
 - [ ] Notas rápidas al completar una tarea
