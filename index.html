@@ -1121,7 +1121,7 @@
                 { id:'all',        label:'Todos',      filter: ()  => true },
                 { id:'borradores', label:'Borradores',  filter: q  => !q.status || q.status === 'pendiente' || q.status === 'borrador' },
                 { id:'enviados',   label:'Enviados',    filter: q  => q.status === 'enviado' },
-                { id:'aprobados',  label:'Aprobados',   filter: q  => q.status === 'aceptado' },
+                { id:'aprobados',  label:'Aprobados',   filter: q  => q.status === 'aceptado' || q.status === 'cobrado' },
                 { id:'cobrados',   label:'Cobrados',    filter: q  => q.status === 'cobrado' },
                 { id:'rechazados', label:'Rechazados',  filter: q  => q.status === 'rechazado' },
                 { id:'vencidos',   label:'Vencidos',    filter: q  => { const d = q.validUntil ? parseQuoteDate(q.validUntil) : null; return d && d < now; } },
@@ -1377,12 +1377,12 @@
             // Estadísticas con nuevos estados
             const pendienteCount = filteredQuotes.filter(q => !q.status || q.status === 'pendiente' || q.status === 'borrador').length;
             const enviadoCount = filteredQuotes.filter(q => q.status === 'enviado').length;
-            const aceptadoCount = filteredQuotes.filter(q => q.status === 'aceptado' || q.status === 'pagado').length;
+            const aceptadoCount = filteredQuotes.filter(q => q.status === 'aceptado' || q.status === 'cobrado' || q.status === 'pagado').length;
             const rechazadoCount = filteredQuotes.filter(q => q.status === 'rechazado').length;
 
             // Calcular total vendido (sin IVA, solo presupuestos aceptados) - ahora dinámico
             const totalVendido = filteredQuotes
-                .filter(q => q.status === 'aceptado' || q.status === 'pagado')
+                .filter(q => q.status === 'aceptado' || q.status === 'cobrado' || q.status === 'pagado')
                 .reduce((sum, q) => {
                     const subtotal = q.items?.reduce((itemSum, item) => {
                         return itemSum + ((item.quantity || 0) * (item.unitPrice || 0));
@@ -1425,7 +1425,7 @@
             const mesesNombres = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
             const ventasPorMes = Array(12).fill(0);
             
-            quotes.filter(q => q.status === 'aceptado' || q.status === 'pagado').forEach(q => {
+            quotes.filter(q => q.status === 'aceptado' || q.status === 'cobrado' || q.status === 'pagado').forEach(q => {
                 if (!q.date) return;
                 const quoteDate = parseQuoteDate(q.date);
                 if (!quoteDate) return;
