@@ -22,4 +22,4 @@
 - [x] Tasa de cierre por cliente
 
 ## Técnico
-- [ ] PWA: manifest.json + service worker para instalar en celular
+- [x] PWA: manifest.json + service worker para instalar en celular
