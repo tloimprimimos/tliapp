@@ -13,8 +13,8 @@
 - [x] Estado "cobrado" post-aceptado (cerrar ciclo de venta)
 
 ## Productividad
-- [ ] Notas rápidas al completar una tarea
-- [ ] Búsqueda global (clientes + presupuestos + tareas desde el header)
+- [x] Notas rápidas al completar una tarea
+- [x] Búsqueda global (clientes + presupuestos + tareas desde el header)
 
 ## Datos y reportes
 - [ ] Total del mes más visible en Dashboard
