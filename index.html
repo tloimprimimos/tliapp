@@ -897,16 +897,36 @@
                 }
             };
 
+            // Elimina valores undefined que Firestore rechaza
+            const cleanForFirestore = (obj) => {
+                const clean = {};
+                Object.entries(obj).forEach(([k, v]) => {
+                    if (v === undefined) return;
+                    if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+                        clean[k] = cleanForFirestore(v);
+                    } else if (Array.isArray(v)) {
+                        clean[k] = v.map(item => (item !== null && typeof item === 'object') ? cleanForFirestore(item) : (item ?? ''));
+                    } else {
+                        clean[k] = v;
+                    }
+                });
+                return clean;
+            };
+
             const saveQuote = async (quote) => {
+                try {
                 if (!quote.status) {
                     quote.status = 'borrador';
                 }
 
-                let quoteId = quote.id;
-                if (quote.id) {
-                    await db.collection('quotes').doc(quote.id).update(quote);
+                const { id, ...data } = quote;
+                const cleanData = cleanForFirestore(data);
+
+                let quoteId = id;
+                if (id) {
+                    await db.collection('quotes').doc(id).update(cleanData);
                 } else {
-                    const ref = await db.collection('quotes').add(quote);
+                    const ref = await db.collection('quotes').add(cleanData);
                     quoteId = ref.id;
                 }
 
@@ -940,6 +960,11 @@
                 } else {
                     const taskDoc = await taskRef.get();
                     if (taskDoc.exists) await taskRef.delete();
+                }
+                } catch (err) {
+                    console.error('Error al guardar presupuesto:', err);
+                    toast('Error al guardar. Revisá los datos e intentá de nuevo.', 'error');
+                    throw err;
                 }
             };
 
@@ -1061,7 +1086,7 @@
                                 clients={clients}
                                 quotes={quotes}
                                 config={config}
-                                onSave={async (quote) => { await saveQuote(quote); setView('quotes'); }}
+                                onSave={async (quote) => { try { await saveQuote(quote); setView('quotes'); } catch {} }}
                                 onCancel={() => setView('quotes')}
                                 onGoToClients={(quoteData) => {
                                     sessionStorage.setItem('tempQuote', JSON.stringify(quoteData));
