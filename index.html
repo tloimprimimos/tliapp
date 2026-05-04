@@ -897,15 +897,20 @@
                 }
             };
 
-            // Elimina valores undefined que Firestore rechaza
+            // Elimina valores que Firestore rechaza: undefined, NaN, Infinity
             const cleanForFirestore = (obj) => {
+                if (obj === null || obj === undefined) return null;
                 const clean = {};
                 Object.entries(obj).forEach(([k, v]) => {
                     if (v === undefined) return;
-                    if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+                    if (typeof v === 'number' && !isFinite(v)) { clean[k] = 0; return; }
+                    if (v !== null && typeof v === 'object' && !Array.isArray(v) && !(v instanceof Date)) {
                         clean[k] = cleanForFirestore(v);
                     } else if (Array.isArray(v)) {
-                        clean[k] = v.map(item => (item !== null && typeof item === 'object') ? cleanForFirestore(item) : (item ?? ''));
+                        clean[k] = v.map(item =>
+                            (item !== null && typeof item === 'object') ? cleanForFirestore(item)
+                            : (item === undefined ? '' : (typeof item === 'number' && !isFinite(item) ? 0 : item))
+                        );
                     } else {
                         clean[k] = v;
                     }
