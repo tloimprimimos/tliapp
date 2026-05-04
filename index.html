@@ -1118,6 +1118,8 @@
             const [activeTab, setActiveTab] = useState(initialDeliveryFilter ? 'por-vencer' : 'all');
             const [sortBy, setSortBy] = useState('date-desc');
             const [pendingChange, setPendingChange] = useState(null);
+            const [dateFrom, setDateFrom] = useState('');
+            const [dateTo, setDateTo] = useState('');
 
             const now = new Date();
             now.setHours(0,0,0,0);
@@ -1144,6 +1146,15 @@
                     q.number?.toLowerCase().includes(s) ||
                     (q.date||'').toLowerCase().includes(s)
                 );
+            }
+            if (dateFrom || dateTo) {
+                filtered = filtered.filter(q => {
+                    const d = q.date ? parseQuoteDate(q.date) : null;
+                    if (!d) return false;
+                    if (dateFrom && d < new Date(dateFrom)) return false;
+                    if (dateTo && d > new Date(dateTo + 'T23:59:59')) return false;
+                    return true;
+                });
             }
             filtered = [...filtered].sort((a, b) => {
                 switch (sortBy) {
@@ -1197,6 +1208,24 @@
                             <option value="client-asc">Cliente A-Z</option>
                             <option value="number-asc">Número ↑</option>
                         </select>
+                    </div>
+
+                    {/* Filtro por rango de fechas */}
+                    <div className="bg-white rounded-2xl px-4 py-3 mb-4 shadow-sm border border-slate-100 flex flex-wrap gap-3 items-center">
+                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Período</span>
+                        <div className="flex items-center gap-2">
+                            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                                className="px-3 py-1.5 border-2 border-slate-200 rounded-xl text-sm text-slate-600 focus:border-indigo-500 bg-slate-50"/>
+                            <span className="text-slate-400 text-sm font-medium">—</span>
+                            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                                className="px-3 py-1.5 border-2 border-slate-200 rounded-xl text-sm text-slate-600 focus:border-indigo-500 bg-slate-50"/>
+                        </div>
+                        {(dateFrom || dateTo) && (
+                            <button onClick={() => { setDateFrom(''); setDateTo(''); }}
+                                className="text-xs text-indigo-600 hover:underline font-semibold">
+                                Limpiar
+                            </button>
+                        )}
                     </div>
 
                     {/* Filter Tabs */}
@@ -1509,40 +1538,36 @@
                         </p>
                     </div>
                     
-                    {/* Tarjetas de estadísticas */}
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+                    {/* Hero: Total vendido + Efectividad */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div className="md:col-span-2 rounded-2xl p-6 text-white card-hover" style={{background:'linear-gradient(135deg,#4f46e5,#7c3aed)'}}>
+                            <p className="text-xs font-bold opacity-70 uppercase tracking-widest mb-2">Total vendido · {selectedMonth === 'current' ? `${mesesNombres[currentMonth]} ${currentYear}` : selectedMonth === 'all' ? `Año ${currentYear}` : (() => { const [y,m] = selectedMonth.split('-'); return `${mesesNombres[parseInt(m)]} ${y}`; })()}</p>
+                            <p className="text-5xl font-extrabold tracking-tight mb-1">${totalVendido.toFixed(2)}</p>
+                            <p className="text-sm opacity-60">{aceptadoCount} presupuesto{aceptadoCount!==1?'s':''} cerrado{aceptadoCount!==1?'s':''} · sin IVA</p>
+                        </div>
+                        <div className="rounded-2xl p-6 text-white card-hover" style={{background:'linear-gradient(135deg,#8b5cf6,#ec4899)'}}>
+                            <p className="text-xs font-bold opacity-70 uppercase tracking-widest mb-2">Efectividad</p>
+                            <p className="text-5xl font-extrabold tracking-tight mb-1">{efectividadPorcentaje}%</p>
+                            <p className="text-sm opacity-60">{aceptadoCount} de {totalPresupuestos} presupuestos</p>
+                        </div>
+                    </div>
+
+                    {/* Tarjetas de estado */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                         {[
-                            { label:'Pendientes', value:pendienteCount, Icon:Icons.Clock, gradient:'from-amber-400 to-orange-500', light:'bg-amber-50 border-amber-100', iconBg:'bg-amber-100', iconColor:'text-amber-600', dark:false },
-                            { label:'Enviados',   value:enviadoCount,   Icon:Icons.Send,  gradient:'from-blue-500 to-indigo-600', light:'bg-blue-50 border-blue-100',  iconBg:'bg-blue-100',  iconColor:'text-blue-600',  dark:false },
-                            { label:'Aceptados',  value:aceptadoCount,  Icon:Icons.CheckCircle, gradient:'from-emerald-500 to-teal-600', light:'bg-emerald-50 border-emerald-100', iconBg:'bg-emerald-100', iconColor:'text-emerald-600', dark:false },
-                            { label:'Rechazados', value:rechazadoCount, Icon:Icons.XCircle, gradient:'from-red-500 to-rose-600', light:'bg-red-50 border-red-100', iconBg:'bg-red-100', iconColor:'text-red-500', dark:false },
+                            { label:'Pendientes', value:pendienteCount, Icon:Icons.Clock,        light:'bg-amber-50 border-amber-100',   iconBg:'bg-amber-100',   iconColor:'text-amber-600' },
+                            { label:'Enviados',   value:enviadoCount,   Icon:Icons.Send,         light:'bg-blue-50 border-blue-100',     iconBg:'bg-blue-100',    iconColor:'text-blue-600'  },
+                            { label:'Aceptados',  value:aceptadoCount,  Icon:Icons.CheckCircle,  light:'bg-emerald-50 border-emerald-100',iconBg:'bg-emerald-100', iconColor:'text-emerald-600'},
+                            { label:'Rechazados', value:rechazadoCount, Icon:Icons.XCircle,      light:'bg-red-50 border-red-100',       iconBg:'bg-red-100',     iconColor:'text-red-500'   },
                         ].map(s => (
                             <div key={s.label} className={`bg-white rounded-2xl shadow-sm border p-4 card-hover ${s.light}`}>
-                                <div className={`${s.iconBg} w-10 h-10 rounded-xl flex items-center justify-center mb-3`}>
-                                    <s.Icon className={`w-5 h-5 ${s.iconColor}`}/>
+                                <div className={`${s.iconBg} w-9 h-9 rounded-xl flex items-center justify-center mb-3`}>
+                                    <s.Icon className={`w-4 h-4 ${s.iconColor}`}/>
                                 </div>
                                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">{s.label}</p>
                                 <p className="text-3xl font-extrabold text-slate-800">{s.value}</p>
                             </div>
                         ))}
-                        <div className="rounded-2xl shadow-sm p-4 text-white card-hover" style={{background:'linear-gradient(135deg,#8b5cf6,#ec4899)'}}>
-                            <div className="bg-white/20 w-10 h-10 rounded-xl flex items-center justify-center mb-3">
-                                <Icons.TrendingUp className="w-5 h-5"/>
-                            </div>
-                            <p className="text-xs font-bold opacity-80 uppercase tracking-wider mb-1">Efectividad</p>
-                            <p className="text-3xl font-extrabold">{efectividadPorcentaje}%</p>
-                            <p className="text-xs opacity-70 mt-1">{aceptadoCount}/{totalPresupuestos}</p>
-                        </div>
-                        <div className="rounded-2xl shadow-sm p-4 text-white card-hover" style={{background:'linear-gradient(135deg,#6366f1,#3b82f6)'}}>
-                            <div className="bg-white/20 w-10 h-10 rounded-xl flex items-center justify-center mb-3">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                            </div>
-                            <p className="text-xs font-bold opacity-80 uppercase tracking-wider mb-1">Vendido</p>
-                            <p className="text-2xl font-extrabold">${totalVendido.toFixed(0)}</p>
-                            <p className="text-xs opacity-70 mt-1">sin IVA</p>
-                        </div>
                     </div>
                     
                     {/* NUEVO: Widget de Seguimiento */}
@@ -1675,6 +1700,52 @@
                                             </div>
                                         );
                                     })}
+                                </div>
+                            </div>
+                        );
+                    })()}
+
+                    {/* Tasa de cierre por cliente */}
+                    {(() => {
+                        const clientMap = {};
+                        quotes.forEach(q => {
+                            const name = q.client?.name; if (!name) return;
+                            if (!clientMap[name]) clientMap[name] = { total: 0, closed: 0, billed: 0 };
+                            clientMap[name].total++;
+                            if (q.status === 'aceptado' || q.status === 'cobrado' || q.status === 'pagado') {
+                                clientMap[name].closed++;
+                                clientMap[name].billed += q.items?.reduce((s,i) => s+((i.quantity||0)*(i.unitPrice||0)),0)||0;
+                            }
+                        });
+                        const top = Object.entries(clientMap)
+                            .map(([name, s]) => ({ name, ...s, rate: s.total > 0 ? Math.round(s.closed/s.total*100) : 0 }))
+                            .filter(c => c.total > 0)
+                            .sort((a,b) => b.billed - a.billed)
+                            .slice(0, 6);
+                        if (top.length === 0) return null;
+                        return (
+                            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 mb-8">
+                                <h3 className="text-base font-bold text-slate-800 mb-4">Tasa de cierre por cliente</h3>
+                                <div className="space-y-3">
+                                    {top.map(c => (
+                                        <div key={c.name} className="flex items-center gap-3">
+                                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-extrabold flex-shrink-0"
+                                                style={{background:'linear-gradient(135deg,#6366f1,#8b5cf6)'}}>
+                                                {c.name[0].toUpperCase()}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center justify-between mb-0.5">
+                                                    <span className="text-sm font-semibold text-slate-800 truncate">{c.name}</span>
+                                                    <span className="text-xs text-slate-500 flex-shrink-0 ml-2">{c.closed}/{c.total} · <span className="font-bold text-slate-700">${c.billed.toFixed(0)}</span></span>
+                                                </div>
+                                                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                    <div className="h-full rounded-full transition-all"
+                                                        style={{width:`${c.rate}%`, background: c.rate >= 70 ? 'linear-gradient(90deg,#10b981,#059669)' : c.rate >= 40 ? 'linear-gradient(90deg,#6366f1,#8b5cf6)' : 'linear-gradient(90deg,#f59e0b,#d97706)'}}/>
+                                                </div>
+                                            </div>
+                                            <span className={`text-sm font-extrabold flex-shrink-0 w-10 text-right ${c.rate >= 70 ? 'text-emerald-600' : c.rate >= 40 ? 'text-indigo-600' : 'text-amber-600'}`}>{c.rate}%</span>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         );

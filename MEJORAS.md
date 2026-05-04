@@ -17,9 +17,9 @@
 - [x] Búsqueda global (clientes + presupuestos + tareas desde el header)
 
 ## Datos y reportes
-- [ ] Total del mes más visible en Dashboard
-- [ ] Filtro de presupuestos por rango de fechas libre
-- [ ] Tasa de cierre por cliente
+- [x] Total del mes más visible en Dashboard
+- [x] Filtro de presupuestos por rango de fechas libre
+- [x] Tasa de cierre por cliente
 
 ## Técnico
 - [ ] PWA: manifest.json + service worker para instalar en celular
