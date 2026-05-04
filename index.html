@@ -1092,6 +1092,7 @@
                                 quotes={quotes}
                                 config={config}
                                 onSave={async (quote) => { try { await saveQuote(quote); setView('quotes'); } catch {} }}
+                                onSaveAndStay={async (quote) => { try { await saveQuote(quote); } catch {} }}
                                 onCancel={() => setView('quotes')}
                                 onGoToClients={(quoteData) => {
                                     sessionStorage.setItem('tempQuote', JSON.stringify(quoteData));
@@ -2124,7 +2125,7 @@
         }
 
         // Quote Form Component (continuará con todo el código del formulario...)
-        function QuoteForm({ quote, clients, config, quotes = [], onSave, onCancel, onGoToClients }) {
+        function QuoteForm({ quote, clients, config, quotes = [], onSave, onSaveAndStay, onCancel, onGoToClients }) {
             // Función para formatear fecha a dd/mm/yyyy
             const formatDateToDDMMYYYY = (date) => {
                 const d = new Date(date);
@@ -2224,6 +2225,19 @@
                     return;
                 }
                 await onSave(formData);
+            };
+
+            const handleSaveAndPDF = async () => {
+                if (!formData.client) {
+                    toast('Seleccioná un cliente primero', 'warning');
+                    return;
+                }
+                try {
+                    if (onSaveAndStay) await onSaveAndStay(formData);
+                    await generatePDF();
+                } catch (e) {
+                    toast('Error al guardar o generar el PDF', 'error');
+                }
             };
 
             // Comprime el logo antes de insertarlo en el PDF para evitar archivos pesados
@@ -2794,25 +2808,23 @@
                                 <Icons.Save className="w-5 h-5" />
                                 <span>Guardar</span>
                             </button>
+                            <button
+                                onClick={quote ? generatePDF : handleSaveAndPDF}
+                                className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center space-x-2"
+                            >
+                                <Icons.Download className="w-5 h-5" />
+                                <span>{quote ? 'Generar PDF' : 'Guardar y PDF'}</span>
+                            </button>
                             {quote && (
-                                <>
-                                    <button
-                                        onClick={generatePDF}
-                                        className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center space-x-2"
-                                    >
-                                        <Icons.Download className="w-5 h-5" />
-                                        <span>Generar PDF</span>
-                                    </button>
-                                    <button
-                                        onClick={sendEmailWithPDF}
-                                        className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center space-x-2"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                                        </svg>
-                                        <span>Enviar por Email</span>
-                                    </button>
-                                </>
+                                <button
+                                    onClick={sendEmailWithPDF}
+                                    className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center space-x-2"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                    </svg>
+                                    <span>Enviar por Email</span>
+                                </button>
                             )}
                         </div>
                     </div>
