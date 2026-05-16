@@ -1275,6 +1275,17 @@
                 toast('Pago eliminado');
             };
 
+            // Limpieza automática: elimina tareas de entrega de presupuestos rechazados
+            useEffect(() => {
+                if (!quotes.length || !tasks.length) return;
+                const rejectedIds = new Set(quotes.filter(q => q.status === 'rechazado').map(q => q.id));
+                tasks.forEach(t => {
+                    if (t.type === 'entrega' && t.quoteId && rejectedIds.has(t.quoteId)) {
+                        db.collection('tasks').doc(t.id).delete();
+                    }
+                });
+            }, [quotes, tasks]);
+
             const pendingTasksCount = tasks.filter(t => t.status !== 'completada').length;
 
             const pendingPaymentsCount = quotes.filter(q => {
