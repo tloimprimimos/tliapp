@@ -1146,7 +1146,10 @@
 
                 // Sincronizar tarea de entrega
                 const taskRef = db.collection('tasks').doc(`delivery-${quoteId}`);
-                if (quote.deliveryDate) {
+                if (quote.status === 'rechazado') {
+                    const taskDoc = await taskRef.get();
+                    if (taskDoc.exists) await taskRef.delete();
+                } else if (quote.deliveryDate) {
                     const d = quote.deliveryDate;
                     const isoDate = d.includes('/')
                         ? (() => { const [day,month,year] = d.split('/'); return `${year}-${month.padStart(2,'0')}-${day.padStart(2,'0')}`; })()
@@ -1216,9 +1219,12 @@
             };
 
             const updateQuoteStatus = async (quoteId, newStatus) => {
-                await db.collection('quotes').doc(quoteId).update({
-                    status: newStatus
-                });
+                await db.collection('quotes').doc(quoteId).update({ status: newStatus });
+                if (newStatus === 'rechazado') {
+                    const taskRef = db.collection('tasks').doc(`delivery-${quoteId}`);
+                    const taskDoc = await taskRef.get();
+                    if (taskDoc.exists) await taskRef.delete();
+                }
             };
 
             const saveConfigData = async (configData) => {
