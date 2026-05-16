@@ -3144,6 +3144,7 @@
             const [historyClient, setHistoryClient] = useState(null);
             const emptyForm = { name:'', rif:'', email:'', phone:'', address:'' };
             const [formData, setFormData]       = useState(emptyForm);
+            const [saving, setSaving]           = useState(false);
 
             const now          = new Date();
             const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -3173,15 +3174,24 @@
 
             const handleSave = async () => {
                 if (!formData.name.trim()) { toast('Ingresá el nombre del cliente', 'warning'); return; }
-                await onSave(formData);
-                setShowForm(false);
-                setEditingClient(null);
-                const tempQuote = sessionStorage.getItem('tempQuote');
-                if (tempQuote) {
-                    sessionStorage.removeItem('tempQuote');
-                    setTimeout(() => toast('Cliente guardado. Seleccionalo en el presupuesto.'), 500);
-                } else {
-                    toast(editingClient ? 'Cliente actualizado' : 'Cliente agregado');
+                if (saving) return;
+                setSaving(true);
+                try {
+                    await onSave(formData);
+                    setShowForm(false);
+                    setEditingClient(null);
+                    setFormData(emptyForm);
+                    const tempQuote = sessionStorage.getItem('tempQuote');
+                    if (tempQuote) {
+                        sessionStorage.removeItem('tempQuote');
+                        setTimeout(() => toast('Cliente guardado. Seleccionalo en el presupuesto.'), 500);
+                    } else {
+                        toast(editingClient ? 'Cliente actualizado' : 'Cliente agregado');
+                    }
+                } catch (e) {
+                    toast('Error al guardar el cliente. Intentá de nuevo.', 'error');
+                } finally {
+                    setSaving(false);
                 }
             };
 
@@ -3455,10 +3465,10 @@
                                             className="px-5 py-2.5 border-2 border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 font-semibold text-sm transition">
                                             Cancelar
                                         </button>
-                                        <button onClick={handleSave}
-                                            className="px-5 py-2.5 text-white font-bold rounded-xl hover:opacity-90 transition text-sm shadow-sm"
+                                        <button onClick={handleSave} disabled={saving}
+                                            className="px-5 py-2.5 text-white font-bold rounded-xl hover:opacity-90 transition text-sm shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
                                             style={{background:'linear-gradient(135deg,#6366f1,#8b5cf6)'}}>
-                                            {editingClient ? 'Guardar cambios' : 'Crear Cliente'}
+                                            {saving ? 'Guardando...' : editingClient ? 'Guardar cambios' : 'Crear Cliente'}
                                         </button>
                                     </div>
                                 </div>
