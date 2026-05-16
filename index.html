@@ -179,6 +179,11 @@
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
                 </svg>
             ),
+            DollarSign: ({className="w-6 h-6"}) => (
+                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            ),
         };
 
         // Helper: configuración visual por estado de presupuesto
@@ -656,8 +661,210 @@
             );
         }
 
+        // ── Payments View ─────────────────────────────────────────────
+        function PaymentsView({ quotes, onAddPayment, onDeletePayment, onMarkCobrado, onViewQuote }) {
+            const [search, setSearch] = useState('');
+            const [filter, setFilter] = useState('pendiente');
+            const [expandedId, setExpandedId] = useState(null);
+            const [addingTo, setAddingTo] = useState(null);
+            const [payForm, setPayForm] = useState({ amount: '', date: new Date().toISOString().slice(0,10), note: '' });
+            const [saving, setSaving] = useState(false);
+
+            const relevant = quotes.filter(q => q.status === 'aceptado' || q.status === 'cobrado');
+
+            const getTotal = (q) => {
+                const sub = (q.items||[]).reduce((s,i) => s + ((i.quantity||0)*(i.unitPrice||0)), 0);
+                return q.includeIva ? sub * 1.16 : sub;
+            };
+            const getPaid = (q) => (q.payments||[]).reduce((s,p) => s + (parseFloat(p.amount)||0), 0);
+            const getBalance = (q) => Math.max(0, getTotal(q) - getPaid(q));
+            const payStatus = (q) => {
+                const paid = getPaid(q);
+                const total = getTotal(q);
+                if (paid >= total - 0.001 && total > 0) return 'cobrado';
+                if (paid > 0) return 'parcial';
+                return 'pendiente';
+            };
+
+            let shown = relevant;
+            if (search) {
+                const s = search.toLowerCase();
+                shown = shown.filter(q => q.client?.name?.toLowerCase().includes(s) || (q.number||'').toLowerCase().includes(s));
+            }
+            if (filter !== 'todos') shown = shown.filter(q => payStatus(q) === filter);
+            shown = [...shown].sort((a,b) => (parseQuoteDate(b.date)||0) - (parseQuoteDate(a.date)||0));
+
+            const totalPendiente = relevant.filter(q => payStatus(q) !== 'cobrado').reduce((s,q) => s + getBalance(q), 0);
+            const totalCobrado   = relevant.filter(q => payStatus(q) === 'cobrado').reduce((s,q) => s + getTotal(q), 0);
+
+            const handleAdd = async (quoteId) => {
+                if (!payForm.amount || isNaN(parseFloat(payForm.amount)) || parseFloat(payForm.amount) <= 0) {
+                    toast('Ingresá un monto válido', 'warning'); return;
+                }
+                setSaving(true);
+                try {
+                    await onAddPayment(quoteId, { id: Date.now().toString(), amount: parseFloat(payForm.amount), date: payForm.date, note: payForm.note });
+                    setPayForm({ amount: '', date: new Date().toISOString().slice(0,10), note: '' });
+                    setAddingTo(null);
+                } finally { setSaving(false); }
+            };
+
+            const sBadge = s => ({ cobrado:'bg-violet-100 text-violet-700', parcial:'bg-amber-100 text-amber-700', pendiente:'bg-slate-100 text-slate-600' }[s]||'bg-slate-100 text-slate-600');
+            const sLabel = s => ({ cobrado:'Cobrado', parcial:'Parcial', pendiente:'Pendiente' }[s]||s);
+
+            return (
+                <div className="max-w-4xl mx-auto p-6">
+                    <div className="mb-6">
+                        <h1 className="text-3xl font-bold text-slate-800">Cobros</h1>
+                        <p className="text-slate-500 mt-1">Seguimiento de pagos por presupuesto</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div className="rounded-2xl p-5 text-white" style={{background:'linear-gradient(135deg,#f59e0b,#d97706)'}}>
+                            <p className="text-xs font-bold opacity-70 uppercase tracking-widest mb-1">Por cobrar</p>
+                            <p className="text-3xl font-extrabold">${totalPendiente.toFixed(2)}</p>
+                        </div>
+                        <div className="rounded-2xl p-5 text-white" style={{background:'linear-gradient(135deg,#10b981,#059669)'}}>
+                            <p className="text-xs font-bold opacity-70 uppercase tracking-widest mb-1">Cobrado</p>
+                            <p className="text-3xl font-extrabold">${totalCobrado.toFixed(2)}</p>
+                        </div>
+                        <div className="rounded-2xl p-5 bg-white border border-slate-100 shadow-sm">
+                            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Presupuestos</p>
+                            <p className="text-3xl font-extrabold text-slate-800">{relevant.length}</p>
+                            <p className="text-xs text-slate-400 mt-1">aceptados + cobrados</p>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-3 mb-5">
+                        <input value={search} onChange={e => setSearch(e.target.value)}
+                            placeholder="Buscar cliente o número..."
+                            className="flex-1 min-w-40 px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"/>
+                        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
+                            {[['pendiente','Pendiente'],['parcial','Parcial'],['cobrado','Cobrado'],['todos','Todos']].map(([v,l]) => (
+                                <button key={v} onClick={() => setFilter(v)}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${filter===v ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                                    {l}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="space-y-3">
+                        {shown.length === 0 && (
+                            <div className="text-center py-16 text-slate-400">
+                                <p className="text-5xl mb-3">💵</p>
+                                <p className="font-semibold">No hay cobros en esta vista</p>
+                            </div>
+                        )}
+                        {shown.map(q => {
+                            const total   = getTotal(q);
+                            const paid    = getPaid(q);
+                            const balance = getBalance(q);
+                            const ps      = payStatus(q);
+                            const expanded = expandedId === q.id;
+                            const pct     = total > 0 ? Math.min(100, (paid/total)*100) : 0;
+                            return (
+                                <div key={q.id} className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
+                                    <div className="p-4 flex items-center gap-4 cursor-pointer hover:bg-slate-50 transition-colors"
+                                        onClick={() => setExpandedId(expanded ? null : q.id)}>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="font-bold text-slate-800 text-sm">{q.client?.name||'Sin cliente'}</span>
+                                                <span className="text-xs text-slate-400">#{q.number}</span>
+                                                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${sBadge(ps)}`}>{sLabel(ps)}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 mt-2">
+                                                <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                    <div className="h-full bg-emerald-500 rounded-full transition-all" style={{width:`${pct}%`}}/>
+                                                </div>
+                                                <span className="text-xs text-slate-400">{pct.toFixed(0)}%</span>
+                                            </div>
+                                        </div>
+                                        <div className="text-right flex-shrink-0">
+                                            <p className="text-xs text-slate-400">Total: ${total.toFixed(2)}</p>
+                                            <p className={`font-bold text-sm ${balance > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                                {balance > 0 ? `$${balance.toFixed(2)} pendiente` : 'Pagado'}
+                                            </p>
+                                        </div>
+                                        <svg className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`}
+                                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
+                                        </svg>
+                                    </div>
+
+                                    {expanded && (
+                                        <div className="border-t border-slate-100 p-4">
+                                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Pagos registrados</h4>
+                                            {(q.payments||[]).length === 0 && <p className="text-sm text-slate-400 mb-3">Sin pagos aún</p>}
+                                            <div className="space-y-2 mb-4">
+                                                {(q.payments||[]).map(p => (
+                                                    <div key={p.id} className="flex items-center gap-3 bg-slate-50 rounded-xl px-3 py-2">
+                                                        <div className="flex-1">
+                                                            <span className="font-semibold text-slate-800 text-sm">${parseFloat(p.amount).toFixed(2)}</span>
+                                                            <span className="text-xs text-slate-400 ml-2">{p.date}</span>
+                                                            {p.note && <span className="text-xs text-slate-500 ml-2">— {p.note}</span>}
+                                                        </div>
+                                                        <button onClick={() => onDeletePayment(q.id, p.id)}
+                                                            className="text-red-400 hover:text-red-600 p-1 rounded-lg hover:bg-red-50 transition-colors">
+                                                            <Icons.Trash2 className="w-3.5 h-3.5"/>
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            {addingTo === q.id ? (
+                                                <div className="bg-violet-50 rounded-xl p-3 space-y-2">
+                                                    <div className="flex gap-2">
+                                                        <input type="number" placeholder="Monto" value={payForm.amount}
+                                                            onChange={e => setPayForm(f => ({...f, amount: e.target.value}))}
+                                                            className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"/>
+                                                        <input type="date" value={payForm.date}
+                                                            onChange={e => setPayForm(f => ({...f, date: e.target.value}))}
+                                                            className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"/>
+                                                    </div>
+                                                    <input placeholder="Nota (opcional, ej: transferencia, efectivo...)" value={payForm.note}
+                                                        onChange={e => setPayForm(f => ({...f, note: e.target.value}))}
+                                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"/>
+                                                    <div className="flex gap-2 justify-end">
+                                                        <button onClick={() => { setAddingTo(null); setPayForm({ amount:'', date:new Date().toISOString().slice(0,10), note:'' }); }}
+                                                            className="px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">Cancelar</button>
+                                                        <button onClick={() => handleAdd(q.id)} disabled={saving}
+                                                            className="px-4 py-1.5 text-sm font-semibold text-white rounded-lg transition-colors disabled:opacity-50"
+                                                            style={{background:'linear-gradient(135deg,#7c3aed,#6d28d9)'}}>
+                                                            {saving ? 'Guardando...' : 'Guardar pago'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="flex flex-wrap gap-2">
+                                                    <button onClick={() => { setAddingTo(q.id); setPayForm({ amount:'', date:new Date().toISOString().slice(0,10), note:'' }); }}
+                                                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-lg transition-colors">
+                                                        <Icons.Plus className="w-3.5 h-3.5"/>Agregar pago
+                                                    </button>
+                                                    {ps !== 'cobrado' && (
+                                                        <button onClick={() => onMarkCobrado(q.id)}
+                                                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors">
+                                                            <Icons.CheckCircle className="w-3.5 h-3.5"/>Marcar cobrado
+                                                        </button>
+                                                    )}
+                                                    <button onClick={() => onViewQuote(q)}
+                                                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+                                                        <Icons.FileText className="w-3.5 h-3.5"/>Ver presupuesto
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        }
+
         // Sidebar Navigation Component
-        function Sidebar({ view, onNavigate, user, onLogout, pendingTasksCount, newClientsCount = 0, open, onClose }) {
+        function Sidebar({ view, onNavigate, user, onLogout, pendingTasksCount, newClientsCount = 0, pendingPaymentsCount = 0, open, onClose }) {
             const [quotesOpen, setQuotesOpen] = useState(
                 ['quote','quotes','quotes-delivery'].includes(view)
             );
@@ -768,6 +975,8 @@
 
                         <NavBtn id="tasks" label="Tareas" Icon={Icons.ClipboardList}
                             badge={pendingTasksCount} active={view === 'tasks'}/>
+                        <NavBtn id="payments" label="Cobros" Icon={Icons.DollarSign}
+                            badge={pendingPaymentsCount} active={view === 'payments'}/>
                         <NavBtn id="settings" label="Configuración" Icon={Icons.Settings}
                             active={view === 'settings'}/>
                     </nav>
@@ -1036,7 +1245,39 @@
                 await db.collection('tasks').doc(taskId).update({ status: newStatus });
             };
 
+            const addPaymentToQuote = async (quoteId, payment) => {
+                const quote = quotes.find(q => q.id === quoteId);
+                if (!quote) return;
+                const payments = [...(quote.payments||[]), payment];
+                await db.collection('quotes').doc(quoteId).update({ payments });
+                const sub = (quote.items||[]).reduce((s,i) => s + ((i.quantity||0)*(i.unitPrice||0)), 0);
+                const total = quote.includeIva ? sub * 1.16 : sub;
+                const paid = payments.reduce((s,p) => s + (parseFloat(p.amount)||0), 0);
+                if (paid >= total - 0.001 && quote.status === 'aceptado') {
+                    await db.collection('quotes').doc(quoteId).update({ status: 'cobrado' });
+                    toast('Pago completo. Presupuesto marcado como Cobrado.');
+                } else {
+                    toast('Pago registrado');
+                }
+            };
+
+            const deletePaymentFromQuote = async (quoteId, paymentId) => {
+                const quote = quotes.find(q => q.id === quoteId);
+                if (!quote) return;
+                const payments = (quote.payments||[]).filter(p => p.id !== paymentId);
+                await db.collection('quotes').doc(quoteId).update({ payments });
+                toast('Pago eliminado');
+            };
+
             const pendingTasksCount = tasks.filter(t => t.status !== 'completada').length;
+
+            const pendingPaymentsCount = quotes.filter(q => {
+                if (q.status !== 'aceptado') return false;
+                const sub = (q.items||[]).reduce((s,i) => s + ((i.quantity||0)*(i.unitPrice||0)), 0);
+                const total = q.includeIva ? sub * 1.16 : sub;
+                const paid = (q.payments||[]).reduce((s,p) => s + (parseFloat(p.amount)||0), 0);
+                return total > 0 && paid < total - 0.001;
+            }).length;
 
             const [clientFormTrigger, setClientFormTrigger] = useState(0);
             const now = new Date();
@@ -1059,6 +1300,7 @@
                         onLogout={onLogout}
                         pendingTasksCount={pendingTasksCount}
                         newClientsCount={newClientsCount}
+                        pendingPaymentsCount={pendingPaymentsCount}
                         open={sidebarOpen}
                         onClose={() => setSidebarOpen(false)}
                     />
@@ -1133,6 +1375,15 @@
                                     if (q) { setCurrentQuote(q); setView('quote'); }
                                     else toast('No se encontró el presupuesto', 'error');
                                 }}
+                            />
+                        )}
+                        {view === 'payments' && (
+                            <PaymentsView
+                                quotes={quotes}
+                                onAddPayment={addPaymentToQuote}
+                                onDeletePayment={deletePaymentFromQuote}
+                                onMarkCobrado={(id) => updateQuoteStatus(id, 'cobrado')}
+                                onViewQuote={(q) => { setCurrentQuote(q); setView('quote'); }}
                             />
                         )}
                         {view === 'settings' && (
@@ -1712,6 +1963,55 @@
                         </div>
                     )}
                     
+                    {/* Widget de Cobros Pendientes */}
+                    {(() => {
+                        const cobPendientes = quotes.filter(q => {
+                            if (q.status !== 'aceptado') return false;
+                            const sub = (q.items||[]).reduce((s,i) => s + ((i.quantity||0)*(i.unitPrice||0)), 0);
+                            const total = q.includeIva ? sub * 1.16 : sub;
+                            const paid = (q.payments||[]).reduce((s,p) => s + (parseFloat(p.amount)||0), 0);
+                            return total > 0 && paid < total - 0.001;
+                        }).map(q => {
+                            const sub = (q.items||[]).reduce((s,i) => s + ((i.quantity||0)*(i.unitPrice||0)), 0);
+                            const total = q.includeIva ? sub * 1.16 : sub;
+                            const paid = (q.payments||[]).reduce((s,p) => s + (parseFloat(p.amount)||0), 0);
+                            return { ...q, _total: total, _paid: paid, _balance: total - paid };
+                        });
+                        const totalAPagar = cobPendientes.reduce((s,q) => s + q._balance, 0);
+                        if (cobPendientes.length === 0) return null;
+                        return (
+                            <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border-l-4 border-amber-500 rounded-lg p-6 mb-8">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div>
+                                        <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                            <Icons.DollarSign className="w-5 h-5 text-amber-600"/>
+                                            Cobros Pendientes
+                                        </h3>
+                                        <p className="text-sm text-slate-600 mt-0.5">
+                                            {cobPendientes.length} presupuesto{cobPendientes.length!==1?'s':''} aceptado{cobPendientes.length!==1?'s':''} sin cobrar · <strong>${totalAPagar.toFixed(2)} total</strong>
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    {cobPendientes.slice(0, 5).map(q => (
+                                        <div key={q.id} className="flex items-center gap-3 bg-white rounded-xl px-4 py-3 shadow-sm cursor-pointer hover:bg-amber-50 transition-colors"
+                                            onClick={() => onViewQuote(q)}>
+                                            <div className="flex-1 min-w-0">
+                                                <span className="font-semibold text-slate-800 text-sm">{q.client?.name||'Sin cliente'}</span>
+                                                <span className="text-xs text-slate-400 ml-2">#{q.number}</span>
+                                                {q._paid > 0 && <span className="text-xs text-emerald-600 ml-2">Parcial: ${q._paid.toFixed(2)}</span>}
+                                            </div>
+                                            <span className="font-bold text-amber-700 flex-shrink-0">${q._balance.toFixed(2)}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                {cobPendientes.length > 5 && (
+                                    <p className="text-xs text-slate-500 mt-3 text-center">... y {cobPendientes.length - 5} más en Cobros</p>
+                                )}
+                            </div>
+                        );
+                    })()}
+
                     {/* Widget de Tareas Urgentes */}
                     {(() => {
                         const nowT = new Date();
@@ -2248,7 +2548,10 @@
                     const canvas = document.createElement('canvas');
                     canvas.width = Math.round(img.width * scale);
                     canvas.height = Math.round(img.height * scale);
-                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#0f172a';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                     resolve(canvas.toDataURL('image/jpeg', quality));
                 };
                 img.onerror = () => resolve(dataUrl);
