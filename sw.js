@@ -1,36 +1,43 @@
-const CACHE = 'tliapp-v1';
-const SHELL = ['/', '/index.html', '/logo.png', '/manifest.json'];
+const CACHE = 'tliapp-v2';
+const STATIC = ['/logo.png', '/manifest.json'];
 
-// Al instalar: guarda el shell en cache
 self.addEventListener('install', e => {
-    e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)));
+    e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC)));
     self.skipWaiting();
 });
 
-// Al activar: borra caches viejos
 self.addEventListener('activate', e => {
     e.waitUntil(
         caches.keys().then(keys =>
             Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-        )
+        ).then(() => self.clients.claim())
     );
-    self.clients.claim();
 });
 
-// Fetch: network-first para mismo origen, pasa directo para CDN/Firebase
+// index.html: siempre de la red (nunca desde caché)
+// Estáticos (logo, manifest): caché primero, red como fallback
 self.addEventListener('fetch', e => {
     if (e.request.method !== 'GET') return;
     const url = new URL(e.request.url);
-    // Solo interceptar recursos del mismo dominio
     if (url.hostname !== self.location.hostname) return;
 
-    e.respondWith(
-        fetch(e.request)
-            .then(res => {
-                const copy = res.clone();
-                caches.open(CACHE).then(c => c.put(e.request, copy));
-                return res;
-            })
-            .catch(() => caches.match(e.request))
-    );
+    const isStatic = STATIC.some(p => url.pathname === p);
+
+    if (isStatic) {
+        e.respondWith(
+            caches.match(e.request).then(cached =>
+                cached || fetch(e.request).then(res => {
+                    const copy = res.clone();
+                    caches.open(CACHE).then(c => c.put(e.request, copy));
+                    return res;
+                })
+            )
+        );
+    }
+    // Para index.html y todo lo demás: no interceptar, deja que el browser lo maneje
+});
+
+// Cuando el SW se actualiza, notifica a todos los clientes para que recarguen
+self.addEventListener('message', e => {
+    if (e.data === 'SKIP_WAITING') self.skipWaiting();
 });
