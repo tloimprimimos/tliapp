@@ -184,6 +184,11 @@
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
             ),
+            ShoppingCart: ({className="w-6 h-6"}) => (
+                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
+                </svg>
+            ),
         };
 
         // Helper: configuración visual por estado de presupuesto
@@ -1055,6 +1060,8 @@
                             badge={pendingTasksCount} active={view === 'tasks'}/>
                         <NavBtn id="payments" label="Cobros" Icon={Icons.DollarSign}
                             badge={pendingPaymentsCount} active={view === 'payments'}/>
+                        <NavBtn id="expenses" label="Gastos" Icon={Icons.ShoppingCart}
+                            active={view === 'expenses'}/>
                         <NavBtn id="settings" label="Configuración" Icon={Icons.Settings}
                             active={view === 'settings'}/>
                     </nav>
@@ -1085,6 +1092,7 @@
             const [clients, setClients] = useState([]);
             const [quotes, setQuotes] = useState([]);
             const [tasks, setTasks] = useState([]);
+            const [expenses, setExpenses] = useState([]);
             const [config, setConfig] = useState({
                 logo: '',
                 companyName: 'TLI - TE LO IMPRIMO',
@@ -1160,11 +1168,18 @@
                         }
                     });
 
+                // Load expenses
+                const unsubExpenses = db.collection('expenses')
+                    .onSnapshot(snapshot => {
+                        setExpenses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                    });
+
                 return () => {
                     unsubClients();
                     unsubQuotes();
                     unsubConfig();
                     unsubTasks();
+                    unsubExpenses();
                 };
             }, [user]);
 
@@ -1325,6 +1340,18 @@
                 }
             };
 
+            const saveExpense = async (expense) => {
+                await db.collection('expenses').add({ ...expense, createdAt: new Date().toISOString() });
+                toast('Gasto registrado');
+            };
+
+            const deleteExpense = async (expenseId) => {
+                if (window.confirm('¿Eliminar este gasto?')) {
+                    await db.collection('expenses').doc(expenseId).delete();
+                    toast('Gasto eliminado');
+                }
+            };
+
             const updateTaskStatus = async (taskId, newStatus) => {
                 await db.collection('tasks').doc(taskId).update({ status: newStatus });
             };
@@ -1417,6 +1444,7 @@
                             <Dashboard
                                 quotes={quotes}
                                 tasks={tasks}
+                                expenses={expenses}
                                 onViewQuote={(quote) => { setCurrentQuote(quote); setView('quote'); }}
                                 onDeleteQuote={deleteQuote}
                                 onUpdateStatus={updateQuoteStatus}
@@ -1479,6 +1507,14 @@
                                 onDeletePayment={deletePaymentFromQuote}
                                 onMarkCobrado={(id) => updateQuoteStatus(id, 'cobrado')}
                                 onViewQuote={(q) => { setCurrentQuote(q); setView('quote'); }}
+                            />
+                        )}
+                        {view === 'expenses' && (
+                            <ExpensesView
+                                quotes={quotes}
+                                expenses={expenses}
+                                onSave={saveExpense}
+                                onDelete={deleteExpense}
                             />
                         )}
                         {view === 'settings' && (
@@ -1777,8 +1813,239 @@
             );
         }
 
+        // ── Expenses View ─────────────────────────────────────────────
+        function ExpensesView({ quotes, expenses, onSave, onDelete }) {
+            const CATEGORIES = ['Materiales','Proveedor','Tercero','Servicios','Transporte','Nómina','Alquiler','Otro'];
+            const CAT_COLORS = {
+                Materiales: 'bg-blue-100 text-blue-700',
+                Proveedor:  'bg-purple-100 text-purple-700',
+                Tercero:    'bg-indigo-100 text-indigo-700',
+                Servicios:  'bg-cyan-100 text-cyan-700',
+                Transporte: 'bg-amber-100 text-amber-700',
+                Nómina:     'bg-emerald-100 text-emerald-700',
+                Alquiler:   'bg-orange-100 text-orange-700',
+                Otro:       'bg-slate-100 text-slate-600',
+            };
+
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            const currentMonth = now.getMonth();
+            const mesesNombres = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+            const [selectedMonth, setSelectedMonth] = useState('current');
+            const [catFilter, setCatFilter] = useState('todas');
+            const [search, setSearch] = useState('');
+            const [showForm, setShowForm] = useState(false);
+            const [saving, setSaving] = useState(false);
+            const emptyForm = { date: now.toISOString().slice(0,10), amount: '', category: 'Materiales', description: '', to: '' };
+            const [form, setForm] = useState(emptyForm);
+
+            const matchMonth = (dateStr) => {
+                if (!dateStr) return false;
+                const d = new Date(dateStr + 'T00:00:00');
+                if (selectedMonth === 'current') return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+                if (selectedMonth === 'all') return true;
+                const [y, m] = selectedMonth.split('-');
+                return d.getFullYear() === parseInt(y) && d.getMonth() === parseInt(m);
+            };
+
+            const periodExpenses = expenses.filter(e => matchMonth(e.date));
+            const totalGastos = periodExpenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+
+            const totalIngresos = quotes
+                .filter(q => (q.status === 'aceptado' || q.status === 'cobrado' || q.status === 'pagado') && q.date)
+                .filter(q => {
+                    const d = parseQuoteDate(q.date);
+                    if (!d) return false;
+                    if (selectedMonth === 'current') return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+                    if (selectedMonth === 'all') return true;
+                    const [y, m] = selectedMonth.split('-');
+                    return d.getFullYear() === parseInt(y) && d.getMonth() === parseInt(m);
+                })
+                .reduce((s, q) => s + ((q.items||[]).reduce((si,i) => si + ((i.quantity||0)*(i.unitPrice||0)), 0)), 0);
+
+            const resultado = totalIngresos - totalGastos;
+
+            let shown = periodExpenses;
+            if (catFilter !== 'todas') shown = shown.filter(e => e.category === catFilter);
+            if (search) {
+                const s = search.toLowerCase();
+                shown = shown.filter(e => e.description?.toLowerCase().includes(s) || e.to?.toLowerCase().includes(s));
+            }
+            shown = [...shown].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+            const monthOptions = [];
+            const oldestDate = expenses.reduce((o, e) => (!e.date ? o : (!o || e.date < o ? e.date : o)), null);
+            if (oldestDate) {
+                const start = new Date(oldestDate + 'T00:00:00');
+                let d = new Date(start.getFullYear(), start.getMonth(), 1);
+                const end = new Date();
+                while (d <= end) {
+                    monthOptions.unshift({ value: `${d.getFullYear()}-${d.getMonth()}`, label: `${mesesNombres[d.getMonth()]} ${d.getFullYear()}` });
+                    d.setMonth(d.getMonth() + 1);
+                }
+            }
+
+            const handleSave = async () => {
+                if (!form.amount || isNaN(parseFloat(form.amount)) || parseFloat(form.amount) <= 0) {
+                    toast('Ingresá un monto válido', 'warning'); return;
+                }
+                if (!form.description.trim()) {
+                    toast('Ingresá una descripción', 'warning'); return;
+                }
+                setSaving(true);
+                try {
+                    await onSave({ ...form, amount: parseFloat(form.amount) });
+                    setForm(emptyForm);
+                    setShowForm(false);
+                } finally { setSaving(false); }
+            };
+
+            const periodLabel = selectedMonth === 'current'
+                ? `${mesesNombres[currentMonth]} ${currentYear}`
+                : selectedMonth === 'all' ? `Todo ${currentYear}`
+                : (() => { const [y,m] = selectedMonth.split('-'); return `${mesesNombres[parseInt(m)]} ${y}`; })();
+
+            return (
+                <div className="max-w-4xl mx-auto p-6">
+                    <div className="mb-6">
+                        <h1 className="text-3xl font-bold text-slate-800">Gastos</h1>
+                        <p className="text-slate-500 mt-1">Materiales, proveedores y pagos</p>
+                    </div>
+
+                    {/* Summary cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div className="rounded-2xl p-5 text-white" style={{background:'linear-gradient(135deg,#ef4444,#dc2626)'}}>
+                            <p className="text-xs font-bold opacity-70 uppercase tracking-widest mb-1">Gastos · {periodLabel}</p>
+                            <p className="text-3xl font-extrabold">${totalGastos.toFixed(2)}</p>
+                            <p className="text-xs opacity-60 mt-1">{periodExpenses.length} registro{periodExpenses.length !== 1 ? 's' : ''}</p>
+                        </div>
+                        <div className="rounded-2xl p-5 text-white" style={{background:'linear-gradient(135deg,#4f46e5,#7c3aed)'}}>
+                            <p className="text-xs font-bold opacity-70 uppercase tracking-widest mb-1">Generado · {periodLabel}</p>
+                            <p className="text-3xl font-extrabold">${totalIngresos.toFixed(2)}</p>
+                            <p className="text-xs opacity-60 mt-1">sin IVA · aceptados</p>
+                        </div>
+                        <div className="rounded-2xl p-5 text-white" style={{background: resultado >= 0 ? 'linear-gradient(135deg,#10b981,#059669)' : 'linear-gradient(135deg,#f59e0b,#d97706)'}}>
+                            <p className="text-xs font-bold opacity-70 uppercase tracking-widest mb-1">Resultado neto</p>
+                            <p className="text-3xl font-extrabold">{resultado < 0 ? '-' : ''}${Math.abs(resultado).toFixed(2)}</p>
+                            <p className="text-xs opacity-60 mt-1">{resultado >= 0 ? 'Positivo' : 'Negativo'}</p>
+                        </div>
+                    </div>
+
+                    {/* Filters + add button */}
+                    <div className="flex flex-wrap gap-3 mb-4 items-center">
+                        <input value={search} onChange={e => setSearch(e.target.value)}
+                            placeholder="Buscar descripción o proveedor..."
+                            className="flex-1 min-w-40 px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-300"/>
+                        <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}
+                            className="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-300">
+                            <option value="current">Mes actual</option>
+                            <option value="all">Todo {currentYear}</option>
+                            {monthOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </select>
+                        <button onClick={() => { setShowForm(true); setForm(emptyForm); }}
+                            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-xl"
+                            style={{background:'linear-gradient(135deg,#ef4444,#dc2626)'}}>
+                            <Icons.Plus className="w-4 h-4"/>Nuevo gasto
+                        </button>
+                    </div>
+
+                    {/* Category pills */}
+                    <div className="flex flex-wrap gap-1.5 mb-5">
+                        {['todas', ...CATEGORIES].map(cat => (
+                            <button key={cat} onClick={() => setCatFilter(cat)}
+                                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${catFilter === cat ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                                {cat === 'todas' ? 'Todas' : cat}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Add form */}
+                    {showForm && (
+                        <div className="bg-red-50 border border-red-100 rounded-2xl p-4 mb-5">
+                            <h3 className="text-sm font-bold text-slate-700 mb-3">Nuevo gasto</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-500 mb-1 block">Descripción *</label>
+                                    <input value={form.description} onChange={e => setForm(f => ({...f, description: e.target.value}))}
+                                        placeholder="Ej: Papel bond A4, tinta negra..."
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-300"/>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-500 mb-1 block">A quién se pagó</label>
+                                    <input value={form.to} onChange={e => setForm(f => ({...f, to: e.target.value}))}
+                                        placeholder="Proveedor, persona, empresa..."
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-300"/>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-500 mb-1 block">Monto *</label>
+                                    <input type="number" value={form.amount} onChange={e => setForm(f => ({...f, amount: e.target.value}))}
+                                        placeholder="0.00"
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-300"/>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-500 mb-1 block">Fecha *</label>
+                                    <input type="date" value={form.date} onChange={e => setForm(f => ({...f, date: e.target.value}))}
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-300"/>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-500 mb-1 block">Categoría *</label>
+                                    <select value={form.category} onChange={e => setForm(f => ({...f, category: e.target.value}))}
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-300 bg-white">
+                                        {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="flex gap-2 justify-end">
+                                <button onClick={() => setShowForm(false)}
+                                    className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-200 rounded-xl transition-colors">
+                                    Cancelar
+                                </button>
+                                <button onClick={handleSave} disabled={saving}
+                                    className="px-5 py-2 text-sm font-semibold text-white rounded-xl disabled:opacity-50"
+                                    style={{background:'linear-gradient(135deg,#ef4444,#dc2626)'}}>
+                                    {saving ? 'Guardando...' : 'Guardar gasto'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Expense list */}
+                    <div className="space-y-2">
+                        {shown.length === 0 && (
+                            <div className="text-center py-16 text-slate-400">
+                                <p className="text-5xl mb-3">🧾</p>
+                                <p className="font-semibold">No hay gastos en este período</p>
+                            </div>
+                        )}
+                        {shown.map(exp => (
+                            <div key={exp.id} className="bg-white border border-slate-100 rounded-2xl shadow-sm px-4 py-3 flex items-center gap-4">
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="font-semibold text-slate-800 text-sm">{exp.description}</span>
+                                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${CAT_COLORS[exp.category] || 'bg-slate-100 text-slate-600'}`}>{exp.category}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3 mt-0.5">
+                                        {exp.to && <span className="text-xs text-slate-400">{exp.to}</span>}
+                                        <span className="text-xs text-slate-400">{exp.date}</span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3 flex-shrink-0">
+                                    <span className="font-bold text-red-600">${parseFloat(exp.amount).toFixed(2)}</span>
+                                    <button onClick={() => onDelete(exp.id)}
+                                        className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                                        <Icons.Trash2 className="w-4 h-4"/>
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
         // Dashboard Component
-        function Dashboard({ quotes, tasks = [], onViewQuote, onDeleteQuote, onUpdateStatus }) {
+        function Dashboard({ quotes, tasks = [], expenses = [], onViewQuote, onDeleteQuote, onUpdateStatus }) {
             const [selectedMonth, setSelectedMonth] = useState('current');
             const [listSearch, setListSearch] = useState('');
             const [listStatus, setListStatus] = useState('all');
@@ -1951,6 +2218,37 @@
                             <p className="text-sm opacity-60">{aceptadoCount} de {totalPresupuestos} presupuestos</p>
                         </div>
                     </div>
+
+                    {/* Resultado financiero */}
+                    {(() => {
+                        const gastosDelPeriodo = expenses.filter(e => {
+                            if (!e.date) return false;
+                            const d = new Date(e.date + 'T00:00:00');
+                            if (selectedMonth === 'current') return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+                            if (selectedMonth === 'all') return true;
+                            const [y, m] = selectedMonth.split('-');
+                            return d.getFullYear() === parseInt(y) && d.getMonth() === parseInt(m);
+                        });
+                        const totalGastos = gastosDelPeriodo.reduce((s,e) => s + (parseFloat(e.amount)||0), 0);
+                        if (totalGastos === 0) return null;
+                        const resultado = totalVendido - totalGastos;
+                        return (
+                            <div className="grid grid-cols-3 gap-0 mb-5 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                                <div className="text-center p-4">
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Generado</p>
+                                    <p className="text-xl font-extrabold text-indigo-600">${totalVendido.toFixed(2)}</p>
+                                </div>
+                                <div className="text-center p-4 border-x border-slate-100">
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Gastos</p>
+                                    <p className="text-xl font-extrabold text-red-500">-${totalGastos.toFixed(2)}</p>
+                                </div>
+                                <div className="text-center p-4">
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Resultado</p>
+                                    <p className={`text-xl font-extrabold ${resultado >= 0 ? 'text-emerald-600' : 'text-amber-600'}`}>{resultado < 0 ? '-' : ''}${Math.abs(resultado).toFixed(2)}</p>
+                                </div>
+                            </div>
+                        );
+                    })()}
 
                     {/* Tarjetas de estado */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
