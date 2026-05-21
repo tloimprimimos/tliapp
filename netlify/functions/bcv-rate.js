@@ -1,69 +1,74 @@
 const https = require('https');
 
-exports.handler = async function () {
-    return new Promise((resolve) => {
+function fetchJSON(urlStr) {
+    return new Promise((resolve, reject) => {
+        const url = new URL(urlStr);
         const options = {
-            hostname: 'www.bcv.org.ve',
-            path: '/',
+            hostname: url.hostname,
+            path: url.pathname + url.search,
             method: 'GET',
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'es-VE,es;q=0.8',
-                'Accept-Encoding': 'identity',
-                'Connection': 'keep-alive',
+                'User-Agent': 'Mozilla/5.0',
+                'Accept': 'application/json',
             },
-            timeout: 15000,
+            timeout: 10000,
         };
-
-        const headers = {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-        };
-
-        const fail = (code, msg) => resolve({ statusCode: code, headers, body: JSON.stringify({ error: msg }) });
-
         const req = https.request(options, (res) => {
+            if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+                return resolve(fetchJSON(res.headers.location));
+            }
             let data = '';
             res.on('data', chunk => { data += chunk; });
             res.on('end', () => {
                 try {
-                    let rate = null;
-
-                    // Intento 1: div#dolar > strong
-                    const dolarBlock = data.match(/id="dolar"([\s\S]{0,800})/);
-                    if (dolarBlock) {
-                        const m = dolarBlock[1].match(/<strong>([\d,.]+)<\/strong>/);
-                        if (m) rate = parseFloat(m[1].replace(/\./g, '').replace(',', '.'));
-                    }
-
-                    // Intento 2: busca el primer número razonable cerca de "dolar" o "USD"
-                    if (!rate || isNaN(rate) || rate < 1) {
-                        const m = data.match(/[Dd]ólar[\s\S]{0,400}?(\d{1,3}[,.]\d{2,8})/);
-                        if (m) rate = parseFloat(m[1].replace(/\./g, '').replace(',', '.'));
-                    }
-
-                    if (rate && !isNaN(rate) && rate > 1 && rate < 10000000) {
-                        resolve({
-                            statusCode: 200,
-                            headers,
-                            body: JSON.stringify({
-                                rate: parseFloat(rate.toFixed(4)),
-                                source: 'BCV',
-                                updatedAt: new Date().toISOString(),
-                            }),
-                        });
-                    } else {
-                        fail(422, 'No se pudo extraer la tasa del BCV. Ingrésala manualmente.');
-                    }
+                    resolve({ status: res.statusCode, json: JSON.parse(data) });
                 } catch (e) {
-                    fail(500, 'Error al procesar la respuesta: ' + e.message);
+                    reject(new Error('No se pudo parsear la respuesta'));
                 }
             });
         });
-
-        req.on('error', e => fail(500, 'Error de conexión: ' + e.message));
-        req.on('timeout', () => { req.destroy(); fail(504, 'Timeout al conectar con BCV'); });
+        req.on('error', reject);
+        req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
         req.end();
     });
+}
+
+exports.handler = async function () {
+    const cors = {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+    };
+
+    // Intento 1: ve.dolarapi.com — tasa oficial BCV
+    try {
+        const { status, json } = await fetchJSON('https://ve.dolarapi.com/v1/dolares/oficial');
+        const rate = json?.promedio;
+        if (status === 200 && rate > 0) {
+            return {
+                statusCode: 200,
+                headers: cors,
+                body: JSON.stringify({ rate: parseFloat(rate.toFixed(4)), source: 'BCV · dolarapi.com', updatedAt: new Date().toISOString() }),
+            };
+        }
+    } catch (_) {}
+
+    // Intento 2: pydolarve.org — tasa BCV
+    try {
+        const { status, json } = await fetchJSON('https://pydolarve.org/api/v1/dollar?page=bcv');
+        const rate = json?.price;
+        if (status === 200 && rate > 0) {
+            return {
+                statusCode: 200,
+                headers: cors,
+                body: JSON.stringify({ rate: parseFloat(parseFloat(rate).toFixed(4)), source: 'BCV · pydolarve.org', updatedAt: new Date().toISOString() }),
+            };
+        }
+    } catch (_) {}
+
+    // Ambos fallaron
+    return {
+        statusCode: 503,
+        headers: cors,
+        body: JSON.stringify({ error: 'No se pudo obtener la tasa del BCV. Ingrésala manualmente en Configuración.' }),
+    };
 };
