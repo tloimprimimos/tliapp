@@ -1569,7 +1569,6 @@
                 { id:'aprobados',  label:'Aprobados',   filter: q  => q.status === 'aceptado' || q.status === 'cobrado' },
                 { id:'cobrados',   label:'Cobrados',    filter: q  => q.status === 'cobrado' },
                 { id:'rechazados', label:'Rechazados',  filter: q  => q.status === 'rechazado' },
-                { id:'vencidos',   label:'Vencidos',    filter: q  => { const d = q.validUntil ? parseQuoteDate(q.validUntil) : null; return d && d < now; } },
                 { id:'por-vencer', label:'Por Vencer',  filter: q  => { const d = q.deliveryDate ? parseQuoteDate(q.deliveryDate) : null; return d && d >= now && d <= in7; } },
             ];
             const activeTabDef = tabDefs.find(t => t.id === activeTab) || tabDefs[0];
@@ -1706,9 +1705,7 @@
                                         const total = q.includeIva ? subtotal*1.16 : subtotal;
                                         const sc = getStatusConfig(q.status || 'pendiente');
                                         const delDate = q.deliveryDate ? parseQuoteDate(q.deliveryDate) : null;
-                                        const valDate = q.validUntil  ? parseQuoteDate(q.validUntil)  : null;
                                         const deliveryOverdue = delDate && delDate < now;
-                                        const isExpired = valDate && valDate < now;
                                         return (
                                             <tr key={q.id} className="hover:bg-indigo-50/30 transition-colors group">
                                                 <td className="py-3 px-4">
@@ -1742,7 +1739,7 @@
                                                 </td>
                                                 <td className="py-3 px-4">
                                                     {q.validUntil
-                                                        ? <span className={`text-sm ${isExpired ? 'text-red-600 font-semibold' : 'text-slate-600'}`}>{q.validUntil}</span>
+                                                        ? <span className="text-sm text-slate-600">{q.validUntil}</span>
                                                         : <span className="text-slate-400 text-sm">—</span>}
                                                 </td>
                                                 <td className="py-3 px-4">
