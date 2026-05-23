@@ -378,13 +378,27 @@
             const handleFetchBCV = async () => {
                 setIsFetchingBCV(true);
                 try {
-                    const res = await fetch('/.netlify/functions/bcv-rate');
-                    const json = await res.json();
-                    if (!res.ok || json.error) throw new Error(json.error || 'Error desconocido');
-                    const updated = { ...editableConfig, bcvRate: json.rate, bcvRateUpdatedAt: json.updatedAt };
+                    let rate = null, updatedAt = new Date().toISOString();
+
+                    // Intento 1: ve.dolarapi.com
+                    try {
+                        const res = await fetch('https://ve.dolarapi.com/v1/dolares/oficial');
+                        const json = await res.json();
+                        if (res.ok && json?.promedio > 0) rate = parseFloat(parseFloat(json.promedio).toFixed(4));
+                    } catch (_) {}
+
+                    // Intento 2: pydolarve.org
+                    if (!rate) {
+                        const res = await fetch('https://pydolarve.org/api/v1/dollar?page=bcv');
+                        const json = await res.json();
+                        if (res.ok && json?.price > 0) rate = parseFloat(parseFloat(json.price).toFixed(4));
+                    }
+
+                    if (!rate) throw new Error('Ambas fuentes fallaron. Ingresa la tasa manualmente.');
+                    const updated = { ...editableConfig, bcvRate: rate, bcvRateUpdatedAt: updatedAt };
                     setEditableConfig(updated);
                     await onSave(updated);
-                    toast(`Tasa BCV actualizada: Bs ${json.rate.toFixed(4)} / USD`);
+                    toast(`Tasa BCV actualizada: Bs ${rate.toFixed(4)} / USD`);
                 } catch (e) {
                     toast('No se pudo obtener la tasa del BCV: ' + e.message, 'error');
                 } finally {

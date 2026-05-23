@@ -2,7 +2,7 @@
   "name": "Te lo Imprimo",
   "short_name": "TLI",
   "description": "Gestión de presupuestos para Te lo Imprimo",
-  "start_url": "/",
+  "start_url": "/tliapp/",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#6366f1",
