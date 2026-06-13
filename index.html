@@ -2082,6 +2082,43 @@
                 }
             };
 
+            // Dimensiones de láminas Vecxel por patrón en el nombre
+            const vecxelDims = [
+                { pattern: '1,22x2,44', sheetW:122, sheetH:244 },
+                { pattern: '1,22x1,83', sheetW:122, sheetH:183 },
+                { pattern: '1,22x1,22', sheetW:122, sheetH:122 },
+                { pattern: '1,22x0,61', sheetW:122, sheetH:61  },
+                { pattern: '0,61x0,61', sheetW:61,  sheetH:61  },
+            ];
+            // Vinil con ancho especial
+            const vinylWidthMap = { 'DTF Textil': 60, 'DTF UV': 60, 'Impresión + Estampado': 150 };
+
+            const runMigration = async () => {
+                if (!window.confirm('¿Actualizar el modo de cálculo de todos los materiales existentes?')) return;
+                setImporting('migrating');
+                let ok = 0;
+                try {
+                    for (const m of materials) {
+                        if (m.calcMode) { ok++; continue; } // ya migrado
+                        let update = { calcMode: 'unit' };
+                        if (m.supplier === 'Vecxel') {
+                            const dim = vecxelDims.find(d => m.name.includes(d.pattern));
+                            update = { calcMode:'area', sheetW: dim?.sheetW||122, sheetH: dim?.sheetH||244 };
+                        } else if (m.supplier === 'Digital Print 2' && m.name !== 'Estampado') {
+                            const vw = Object.entries(vinylWidthMap).find(([k]) => m.name.includes(k));
+                            update = { calcMode:'vinyl', vinylWidth: vw ? vw[1] : 137 };
+                        }
+                        await db.collection('inventory').doc(m.id).update(update);
+                        ok++;
+                    }
+                    toast(`✅ ${ok} materiales migrados`);
+                } catch(e) {
+                    toast('Error: ' + e.message, 'error');
+                } finally {
+                    setImporting(false);
+                }
+            };
+
             // ── MATERIALES state ──
             const UNITS = ['unidad','m²','ml','cm','pliego','kg','litro','rollo','metro','hora','otro'];
             const MAT_CATS = ['Vinil','Acrílico','MDF','Sublimación','Papel','Tinta','Herraje','Embalaje','Otro'];
@@ -2201,6 +2238,10 @@
                             <p className="text-sm text-slate-500 mt-0.5">Materiales, recetas y análisis de precio unitario</p>
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
+                            <button onClick={runMigration} disabled={!!importing}
+                                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border border-amber-200 text-amber-600 hover:bg-amber-50 rounded-xl transition disabled:opacity-50">
+                                {importing === 'migrating' ? '⏳ Migrando...' : '🔄 Migrar modos de cálculo'}
+                            </button>
                             <button onClick={() => runImport(digitalPrint2, 'Digital Print 2')} disabled={!!importing}
                                 className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border border-violet-200 text-violet-600 hover:bg-violet-50 rounded-xl transition disabled:opacity-50">
                                 {importing === 'Digital Print 2' ? '⏳ Importando...' : '⬇️ Digital Print 2 (Vinil)'}
