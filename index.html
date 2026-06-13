@@ -2002,6 +2002,12 @@
             const [tab, setTab] = useState('materials'); // 'materials' | 'products'
             const [importing, setImporting] = useState(false);
 
+            const maquinas = [
+                { name: 'Hora máquina — OmTech K40 CO2',   category: 'Otro', unit: 'hora', costUsd: 0.13, supplier: '', notes: 'Depreciación: $1200 / 5 años / 1800 h/año', calcMode:'unit' },
+                { name: 'Hora máquina — Monport 40W CO2',  category: 'Otro', unit: 'hora', costUsd: 0.09, supplier: '', notes: 'Depreciación: $800 / 5 años / 1800 h/año',  calcMode:'unit' },
+                { name: 'Hora máquina — Sculpfun S10',     category: 'Otro', unit: 'hora', costUsd: 0.06, supplier: '', notes: 'Depreciación: $500 / 5 años / 1800 h/año',  calcMode:'unit' },
+            ];
+
             const digitalPrint2 = [
                 { name: 'Banner 13 onzas / Vinil 140gr',          category: 'Vinil', unit: 'm²', costUsd: 7,  supplier: 'Digital Print 2', notes: 'Impresión gran formato', calcMode:'vinyl', vinylWidth:137 },
                 { name: 'Banner Black Out',                        category: 'Vinil', unit: 'm²', costUsd: 8,  supplier: 'Digital Print 2', notes: 'Impresión gran formato', calcMode:'vinyl', vinylWidth:137 },
@@ -2238,6 +2244,10 @@
                             <p className="text-sm text-slate-500 mt-0.5">Materiales, recetas y análisis de precio unitario</p>
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
+                            <button onClick={() => runImport(maquinas, 'Máquinas')} disabled={!!importing}
+                                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border border-orange-200 text-orange-600 hover:bg-orange-50 rounded-xl transition disabled:opacity-50">
+                                {importing === 'Máquinas' ? '⏳ Importando...' : '⬇️ Máquinas (depreciación)'}
+                            </button>
                             <button onClick={runMigration} disabled={!!importing}
                                 className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border border-amber-200 text-amber-600 hover:bg-amber-50 rounded-xl transition disabled:opacity-50">
                                 {importing === 'migrating' ? '⏳ Migrando...' : '🔄 Migrar modos de cálculo'}
