@@ -2000,6 +2000,39 @@
         // ─── INVENTORY VIEW ───────────────────────────────────────────────────────
         function InventoryView({ materials, products, onSaveMaterial, onDeleteMaterial, onSaveProduct, onDeleteProduct }) {
             const [tab, setTab] = useState('materials'); // 'materials' | 'products'
+            const [importing, setImporting] = useState(false);
+
+            const sublimacionAmericana = [
+                { name: 'Bolígrafo de Botón',              category: 'Sublimación', unit: 'unidad', costUsd: 1.74,   supplier: 'Sublimación Americana', notes: 'Ref: B172/B173' },
+                { name: 'Bolígrafo de Gancho',             category: 'Sublimación', unit: 'unidad', costUsd: 1.74,   supplier: 'Sublimación Americana', notes: 'Ref: PRF409' },
+                { name: 'Cooler de Rosca 750ml',           category: 'Sublimación', unit: 'unidad', costUsd: 6.96,   supplier: 'Sublimación Americana', notes: 'Ref: C151 C098 C103 C152 C189 C041' },
+                { name: 'Cooler Doble Tapa 400ml',         category: 'Sublimación', unit: 'unidad', costUsd: 4.35,   supplier: 'Sublimación Americana', notes: 'Ref: C204/C205' },
+                { name: 'Cooler Doble Tapa 600ml',         category: 'Sublimación', unit: 'unidad', costUsd: 4.35,   supplier: 'Sublimación Americana', notes: '' },
+                { name: 'Lata de Aluminio 300ml',          category: 'Sublimación', unit: 'unidad', costUsd: 6.09,   supplier: 'Sublimación Americana', notes: 'Ref: L001/L009' },
+                { name: 'Lata de Aluminio 350ml',          category: 'Sublimación', unit: 'unidad', costUsd: 6.09,   supplier: 'Sublimación Americana', notes: 'Ref: L076/L077' },
+                { name: 'Llaveros de Aluminio',            category: 'Sublimación', unit: 'unidad', costUsd: 1.74,   supplier: 'Sublimación Americana', notes: 'Ref: PRF408' },
+                { name: 'Taza Blanca 7oz',                 category: 'Sublimación', unit: 'unidad', costUsd: 2.61,   supplier: 'Sublimación Americana', notes: 'Ref: T018' },
+                { name: 'Taza Blanca AAA 11oz',            category: 'Sublimación', unit: 'unidad', costUsd: 1.74,   supplier: 'Sublimación Americana', notes: 'Precio c/u por caja 36 uds — Ref: CCT349' },
+                { name: 'Taza Blanca Borde Redondo 11oz',  category: 'Sublimación', unit: 'unidad', costUsd: 4.35,   supplier: 'Sublimación Americana', notes: 'Ref: T511' },
+                { name: 'Taza Mágica 11oz (c/ caja)',      category: 'Sublimación', unit: 'unidad', costUsd: 4.35,   supplier: 'Sublimación Americana', notes: 'Incluye caja blanca' },
+                { name: 'Taza Mágica 11oz',                category: 'Sublimación', unit: 'unidad', costUsd: 3.46,   supplier: 'Sublimación Americana', notes: 'Ref: T488' },
+                { name: 'Taza Mágica 11oz (Caja x36)',     category: 'Sublimación', unit: 'caja',   costUsd: 162.97, supplier: 'Sublimación Americana', notes: 'Caja 36 uds c/ caja blanca — Ref: CCT011' },
+            ];
+
+            const runImport = async () => {
+                if (!window.confirm(`¿Cargar ${sublimacionAmericana.length} materiales de Sublimación Americana?`)) return;
+                setImporting(true);
+                try {
+                    for (const mat of sublimacionAmericana) {
+                        await onSaveMaterial(mat);
+                    }
+                    toast(`✅ ${sublimacionAmericana.length} materiales importados`);
+                } catch(e) {
+                    toast('Error al importar: ' + e.message, 'error');
+                } finally {
+                    setImporting(false);
+                }
+            };
 
             // ── MATERIALES state ──
             const UNITS = ['unidad','m²','ml','cm','pliego','kg','litro','rollo','metro','hora','otro'];
@@ -2100,10 +2133,17 @@
                             </h1>
                             <p className="text-sm text-slate-500 mt-0.5">Materiales, recetas y análisis de precio unitario</p>
                         </div>
-                        {/* Tabs */}
-                        <div className="flex gap-2 bg-slate-100 p-1 rounded-xl">
-                            <button className={tabCls('materials')} onClick={() => setTab('materials')}>📦 Materiales</button>
-                            <button className={tabCls('products')} onClick={() => setTab('products')}>🏷️ Productos (APU)</button>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            {/* Botón importar */}
+                            <button onClick={runImport} disabled={importing}
+                                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border border-indigo-200 text-indigo-600 hover:bg-indigo-50 rounded-xl transition disabled:opacity-50">
+                                {importing ? '⏳ Importando...' : '⬇️ Importar Sublimación Americana'}
+                            </button>
+                            {/* Tabs */}
+                            <div className="flex gap-2 bg-slate-100 p-1 rounded-xl">
+                                <button className={tabCls('materials')} onClick={() => setTab('materials')}>📦 Materiales</button>
+                                <button className={tabCls('products')} onClick={() => setTab('products')}>🏷️ Productos (APU)</button>
+                            </div>
                         </div>
                     </div>
 
