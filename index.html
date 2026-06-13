@@ -2002,6 +2002,22 @@
             const [tab, setTab] = useState('materials'); // 'materials' | 'products'
             const [importing, setImporting] = useState(false);
 
+            const digitalPrint2 = [
+                { name: 'Banner 13 onzas / Vinil 140gr',          category: 'Vinil', unit: 'm²', costUsd: 7,  supplier: 'Digital Print 2', notes: 'Impresión gran formato', calcMode:'vinyl', vinylWidth:137 },
+                { name: 'Banner Black Out',                        category: 'Vinil', unit: 'm²', costUsd: 8,  supplier: 'Digital Print 2', notes: 'Impresión gran formato', calcMode:'vinyl', vinylWidth:137 },
+                { name: 'Etiquetas vinil 140gr',                   category: 'Vinil', unit: 'm²', costUsd: 12, supplier: 'Digital Print 2', notes: 'Etiquetas contorneadas', calcMode:'vinyl', vinylWidth:137 },
+                { name: 'Etiquetas vinil laminado 140gr',          category: 'Vinil', unit: 'm²', costUsd: 16, supplier: 'Digital Print 2', notes: 'Etiquetas contorneadas laminadas', calcMode:'vinyl', vinylWidth:137 },
+                { name: 'Vinil laminado',                          category: 'Vinil', unit: 'm²', costUsd: 14, supplier: 'Digital Print 2', notes: 'Material especial', calcMode:'vinyl', vinylWidth:137 },
+                { name: 'Microperforado',                          category: 'Vinil', unit: 'm²', costUsd: 11, supplier: 'Digital Print 2', notes: 'Material especial', calcMode:'vinyl', vinylWidth:137 },
+                { name: 'Banner 13 onzas / Vinil 140gr UV',        category: 'Vinil', unit: 'm²', costUsd: 18, supplier: 'Digital Print 2', notes: 'Impresión UV gran formato', calcMode:'vinyl', vinylWidth:137 },
+                { name: 'Banner Black Out UV',                     category: 'Vinil', unit: 'm²', costUsd: 19, supplier: 'Digital Print 2', notes: 'Impresión UV gran formato', calcMode:'vinyl', vinylWidth:137 },
+                { name: 'DTF Textil (60cm ancho)',                  category: 'Sublimación', unit: 'metro', costUsd: 18, supplier: 'Digital Print 2', notes: 'DTF ancho 60cm', calcMode:'vinyl', vinylWidth:60 },
+                { name: 'DTF UV por metro (60cm ancho)',            category: 'Sublimación', unit: 'metro', costUsd: 35, supplier: 'Digital Print 2', notes: 'DTF UV ancho 60cm', calcMode:'vinyl', vinylWidth:60 },
+                { name: 'Impresión sublimación',                    category: 'Sublimación', unit: 'm²', costUsd: 9,  supplier: 'Digital Print 2', notes: 'Sublimación estándar', calcMode:'vinyl', vinylWidth:137 },
+                { name: 'Estampado',                               category: 'Sublimación', unit: 'unidad', costUsd: 5, supplier: 'Digital Print 2', notes: '', calcMode:'unit' },
+                { name: 'Impresión + Estampado (metro lineal 150cm)', category: 'Sublimación', unit: 'metro', costUsd: 12, supplier: 'Digital Print 2', notes: 'Metro lineal 150cm de ancho', calcMode:'vinyl', vinylWidth:150 },
+            ];
+
             const sublimacionAmericana = [
                 { name: 'Bolígrafo de Botón',              category: 'Sublimación', unit: 'unidad', costUsd: 1.74,   supplier: 'Sublimación Americana', notes: 'Ref: B172/B173' },
                 { name: 'Bolígrafo de Gancho',             category: 'Sublimación', unit: 'unidad', costUsd: 1.74,   supplier: 'Sublimación Americana', notes: 'Ref: PRF409' },
@@ -2019,37 +2035,38 @@
                 { name: 'Taza Mágica 11oz (Caja x36)',     category: 'Sublimación', unit: 'caja',   costUsd: 162.97, supplier: 'Sublimación Americana', notes: 'Caja 36 uds c/ caja blanca — Ref: CCT011' },
             ];
 
+            // sheetW/sheetH en cm según tamaño de lámina
             const vecxel = [
                 // Acrílico Transparente 3mm
-                { name: 'Acrílico Transparente 3mm — Lámina 1,22x2,44',  category: 'Acrílico', unit: 'unidad', costUsd: 76.19, supplier: 'Vecxel', notes: 'Transparente 3mm — Lámina completa' },
-                { name: 'Acrílico Transparente 3mm — 3/4 Lámina 1,22x1,83', category: 'Acrílico', unit: 'unidad', costUsd: 62.34, supplier: 'Vecxel', notes: 'Transparente 3mm' },
-                { name: 'Acrílico Transparente 3mm — 1/2 Lámina 1,22x1,22', category: 'Acrílico', unit: 'unidad', costUsd: 41.56, supplier: 'Vecxel', notes: 'Transparente 3mm' },
-                { name: 'Acrílico Transparente 3mm — 1/4 Lámina 1,22x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 20.78, supplier: 'Vecxel', notes: 'Transparente 3mm' },
-                { name: 'Acrílico Transparente 3mm — 1/8 Lámina 0,61x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 13.85, supplier: 'Vecxel', notes: 'Transparente 3mm' },
+                { name: 'Acrílico Transparente 3mm — Lámina 1,22x2,44',     category: 'Acrílico', unit: 'unidad', costUsd: 76.19,  supplier: 'Vecxel', notes: 'Transparente 3mm', calcMode:'area', sheetW:122, sheetH:244 },
+                { name: 'Acrílico Transparente 3mm — 3/4 Lámina 1,22x1,83', category: 'Acrílico', unit: 'unidad', costUsd: 62.34,  supplier: 'Vecxel', notes: 'Transparente 3mm', calcMode:'area', sheetW:122, sheetH:183 },
+                { name: 'Acrílico Transparente 3mm — 1/2 Lámina 1,22x1,22', category: 'Acrílico', unit: 'unidad', costUsd: 41.56,  supplier: 'Vecxel', notes: 'Transparente 3mm', calcMode:'area', sheetW:122, sheetH:122 },
+                { name: 'Acrílico Transparente 3mm — 1/4 Lámina 1,22x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 20.78,  supplier: 'Vecxel', notes: 'Transparente 3mm', calcMode:'area', sheetW:122, sheetH:61  },
+                { name: 'Acrílico Transparente 3mm — 1/8 Lámina 0,61x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 13.85,  supplier: 'Vecxel', notes: 'Transparente 3mm', calcMode:'area', sheetW:61,  sheetH:61  },
                 // Acrílico Transparente 2mm
-                { name: 'Acrílico Transparente 2mm — Lámina 1,22x2,44',  category: 'Acrílico', unit: 'unidad', costUsd: 67.18, supplier: 'Vecxel', notes: 'Transparente 2mm — Lámina completa' },
-                { name: 'Acrílico Transparente 2mm — 3/4 Lámina 1,22x1,83', category: 'Acrílico', unit: 'unidad', costUsd: 52.25, supplier: 'Vecxel', notes: 'Transparente 2mm' },
-                { name: 'Acrílico Transparente 2mm — 1/2 Lámina 1,22x1,22', category: 'Acrílico', unit: 'unidad', costUsd: 37.32, supplier: 'Vecxel', notes: 'Transparente 2mm' },
-                { name: 'Acrílico Transparente 2mm — 1/4 Lámina 1,22x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 22.39, supplier: 'Vecxel', notes: 'Transparente 2mm' },
-                { name: 'Acrílico Transparente 2mm — 1/8 Lámina 0,61x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 14.93, supplier: 'Vecxel', notes: 'Transparente 2mm' },
+                { name: 'Acrílico Transparente 2mm — Lámina 1,22x2,44',     category: 'Acrílico', unit: 'unidad', costUsd: 67.18,  supplier: 'Vecxel', notes: 'Transparente 2mm', calcMode:'area', sheetW:122, sheetH:244 },
+                { name: 'Acrílico Transparente 2mm — 3/4 Lámina 1,22x1,83', category: 'Acrílico', unit: 'unidad', costUsd: 52.25,  supplier: 'Vecxel', notes: 'Transparente 2mm', calcMode:'area', sheetW:122, sheetH:183 },
+                { name: 'Acrílico Transparente 2mm — 1/2 Lámina 1,22x1,22', category: 'Acrílico', unit: 'unidad', costUsd: 37.32,  supplier: 'Vecxel', notes: 'Transparente 2mm', calcMode:'area', sheetW:122, sheetH:122 },
+                { name: 'Acrílico Transparente 2mm — 1/4 Lámina 1,22x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 22.39,  supplier: 'Vecxel', notes: 'Transparente 2mm', calcMode:'area', sheetW:122, sheetH:61  },
+                { name: 'Acrílico Transparente 2mm — 1/8 Lámina 0,61x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 14.93,  supplier: 'Vecxel', notes: 'Transparente 2mm', calcMode:'area', sheetW:61,  sheetH:61  },
                 // Acrílico Espejo Gold/Silver 2mm
-                { name: 'Acrílico Espejo Gold/Silver 2mm — Lámina 1,22x2,44',  category: 'Acrílico', unit: 'unidad', costUsd: 108.85, supplier: 'Vecxel', notes: 'Espejo Gold/Silver 2mm — Lámina completa' },
-                { name: 'Acrílico Espejo Gold/Silver 2mm — 3/4 Lámina 1,22x1,83', category: 'Acrílico', unit: 'unidad', costUsd: 85.23, supplier: 'Vecxel', notes: 'Espejo Gold/Silver 2mm' },
-                { name: 'Acrílico Espejo Gold/Silver 2mm — 1/2 Lámina 1,22x1,22', category: 'Acrílico', unit: 'unidad', costUsd: 53.87, supplier: 'Vecxel', notes: 'Espejo Gold/Silver 2mm' },
-                { name: 'Acrílico Espejo Gold/Silver 2mm — 1/4 Lámina 1,22x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 30.99, supplier: 'Vecxel', notes: 'Espejo Gold/Silver 2mm' },
-                { name: 'Acrílico Espejo Gold/Silver 2mm — 1/8 Lámina 0,61x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 15.50, supplier: 'Vecxel', notes: 'Espejo Gold/Silver 2mm' },
+                { name: 'Acrílico Espejo Gold/Silver 2mm — Lámina 1,22x2,44',     category: 'Acrílico', unit: 'unidad', costUsd: 108.85, supplier: 'Vecxel', notes: 'Espejo Gold/Silver 2mm', calcMode:'area', sheetW:122, sheetH:244 },
+                { name: 'Acrílico Espejo Gold/Silver 2mm — 3/4 Lámina 1,22x1,83', category: 'Acrílico', unit: 'unidad', costUsd: 85.23,  supplier: 'Vecxel', notes: 'Espejo Gold/Silver 2mm', calcMode:'area', sheetW:122, sheetH:183 },
+                { name: 'Acrílico Espejo Gold/Silver 2mm — 1/2 Lámina 1,22x1,22', category: 'Acrílico', unit: 'unidad', costUsd: 53.87,  supplier: 'Vecxel', notes: 'Espejo Gold/Silver 2mm', calcMode:'area', sheetW:122, sheetH:122 },
+                { name: 'Acrílico Espejo Gold/Silver 2mm — 1/4 Lámina 1,22x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 30.99,  supplier: 'Vecxel', notes: 'Espejo Gold/Silver 2mm', calcMode:'area', sheetW:122, sheetH:61  },
+                { name: 'Acrílico Espejo Gold/Silver 2mm — 1/8 Lámina 0,61x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 15.50,  supplier: 'Vecxel', notes: 'Espejo Gold/Silver 2mm', calcMode:'area', sheetW:61,  sheetH:61  },
                 // Acrílico Espejo Gold/Silver 3mm
-                { name: 'Acrílico Espejo Gold/Silver 3mm — Lámina 1,22x2,44',  category: 'Acrílico', unit: 'unidad', costUsd: 134.89, supplier: 'Vecxel', notes: 'Espejo Gold/Silver 3mm — Lámina completa' },
-                { name: 'Acrílico Espejo Gold/Silver 3mm — 3/4 Lámina 1,22x1,83', category: 'Acrílico', unit: 'unidad', costUsd: 104.91, supplier: 'Vecxel', notes: 'Espejo Gold/Silver 3mm' },
-                { name: 'Acrílico Espejo Gold/Silver 3mm — 1/2 Lámina 1,22x1,22', category: 'Acrílico', unit: 'unidad', costUsd: 74.94, supplier: 'Vecxel', notes: 'Espejo Gold/Silver 3mm' },
-                { name: 'Acrílico Espejo Gold/Silver 3mm — 1/4 Lámina 1,22x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 44.96, supplier: 'Vecxel', notes: 'Espejo Gold/Silver 3mm' },
-                { name: 'Acrílico Espejo Gold/Silver 3mm — 1/8 Lámina 0,61x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 29.98, supplier: 'Vecxel', notes: 'Espejo Gold/Silver 3mm' },
+                { name: 'Acrílico Espejo Gold/Silver 3mm — Lámina 1,22x2,44',     category: 'Acrílico', unit: 'unidad', costUsd: 134.89, supplier: 'Vecxel', notes: 'Espejo Gold/Silver 3mm', calcMode:'area', sheetW:122, sheetH:244 },
+                { name: 'Acrílico Espejo Gold/Silver 3mm — 3/4 Lámina 1,22x1,83', category: 'Acrílico', unit: 'unidad', costUsd: 104.91, supplier: 'Vecxel', notes: 'Espejo Gold/Silver 3mm', calcMode:'area', sheetW:122, sheetH:183 },
+                { name: 'Acrílico Espejo Gold/Silver 3mm — 1/2 Lámina 1,22x1,22', category: 'Acrílico', unit: 'unidad', costUsd: 74.94,  supplier: 'Vecxel', notes: 'Espejo Gold/Silver 3mm', calcMode:'area', sheetW:122, sheetH:122 },
+                { name: 'Acrílico Espejo Gold/Silver 3mm — 1/4 Lámina 1,22x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 44.96,  supplier: 'Vecxel', notes: 'Espejo Gold/Silver 3mm', calcMode:'area', sheetW:122, sheetH:61  },
+                { name: 'Acrílico Espejo Gold/Silver 3mm — 1/8 Lámina 0,61x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 29.98,  supplier: 'Vecxel', notes: 'Espejo Gold/Silver 3mm', calcMode:'area', sheetW:61,  sheetH:61  },
                 // Acrílico Espejo Colores 3mm
-                { name: 'Acrílico Espejo Colores 3mm — Lámina 1,22x2,44',  category: 'Acrílico', unit: 'unidad', costUsd: 171.78, supplier: 'Vecxel', notes: 'Espejo Colores 3mm (Verde/Azul/Rojo/Morado/Rose Gold/Gris/Bronce) — Lámina completa' },
-                { name: 'Acrílico Espejo Colores 3mm — 3/4 Lámina 1,22x1,83', category: 'Acrílico', unit: 'unidad', costUsd: 133.03, supplier: 'Vecxel', notes: 'Espejo Colores 3mm' },
-                { name: 'Acrílico Espejo Colores 3mm — 1/2 Lámina 1,22x1,22', category: 'Acrílico', unit: 'unidad', costUsd: 86.54,  supplier: 'Vecxel', notes: 'Espejo Colores 3mm' },
-                { name: 'Acrílico Espejo Colores 3mm — 1/4 Lámina 1,22x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 46.49,  supplier: 'Vecxel', notes: 'Espejo Colores 3mm' },
-                { name: 'Acrílico Espejo Colores 3mm — 1/8 Lámina 0,61x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 30.99,  supplier: 'Vecxel', notes: 'Espejo Colores 3mm' },
+                { name: 'Acrílico Espejo Colores 3mm — Lámina 1,22x2,44',     category: 'Acrílico', unit: 'unidad', costUsd: 171.78, supplier: 'Vecxel', notes: 'Espejo Colores 3mm (Verde/Azul/Rojo/Morado/Rose Gold/Gris/Bronce)', calcMode:'area', sheetW:122, sheetH:244 },
+                { name: 'Acrílico Espejo Colores 3mm — 3/4 Lámina 1,22x1,83', category: 'Acrílico', unit: 'unidad', costUsd: 133.03, supplier: 'Vecxel', notes: 'Espejo Colores 3mm', calcMode:'area', sheetW:122, sheetH:183 },
+                { name: 'Acrílico Espejo Colores 3mm — 1/2 Lámina 1,22x1,22', category: 'Acrílico', unit: 'unidad', costUsd: 86.54,  supplier: 'Vecxel', notes: 'Espejo Colores 3mm', calcMode:'area', sheetW:122, sheetH:122 },
+                { name: 'Acrílico Espejo Colores 3mm — 1/4 Lámina 1,22x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 46.49,  supplier: 'Vecxel', notes: 'Espejo Colores 3mm', calcMode:'area', sheetW:122, sheetH:61  },
+                { name: 'Acrílico Espejo Colores 3mm — 1/8 Lámina 0,61x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 30.99,  supplier: 'Vecxel', notes: 'Espejo Colores 3mm', calcMode:'area', sheetW:61,  sheetH:61  },
             ];
 
             const runImport = async (list, name) => {
@@ -2068,7 +2085,8 @@
             // ── MATERIALES state ──
             const UNITS = ['unidad','m²','ml','cm','pliego','kg','litro','rollo','metro','hora','otro'];
             const MAT_CATS = ['Vinil','Acrílico','MDF','Sublimación','Papel','Tinta','Herraje','Embalaje','Otro'];
-            const emptyMat = { name:'', unit:'unidad', costUsd:0, category:'Otro', supplier:'', notes:'' };
+            // calcMode: 'unit' = por cantidad | 'area' = lámina (sheetW×sheetH cm) | 'vinyl' = vinil m² (ancho fijo)
+            const emptyMat = { name:'', unit:'unidad', costUsd:0, category:'Otro', supplier:'', notes:'', calcMode:'unit', sheetW:0, sheetH:0, vinylWidth:137 };
             const [matForm, setMatForm] = useState(emptyMat);
             const [editingMatId, setEditingMatId] = useState(null);
             const [showMatForm, setShowMatForm] = useState(false);
@@ -2076,7 +2094,7 @@
             const [savingMat, setSavingMat] = useState(false);
 
             const openNewMat = () => { setMatForm(emptyMat); setEditingMatId(null); setShowMatForm(true); };
-            const openEditMat = (m) => { setMatForm({ name:m.name, unit:m.unit, costUsd:m.costUsd||0, category:m.category||'Otro', supplier:m.supplier||'', notes:m.notes||'' }); setEditingMatId(m.id); setShowMatForm(true); };
+            const openEditMat = (m) => { setMatForm({ name:m.name, unit:m.unit, costUsd:m.costUsd||0, category:m.category||'Otro', supplier:m.supplier||'', notes:m.notes||'', calcMode:m.calcMode||'unit', sheetW:m.sheetW||0, sheetH:m.sheetH||0, vinylWidth:m.vinylWidth||137 }); setEditingMatId(m.id); setShowMatForm(true); };
             const cancelMat = () => { setShowMatForm(false); setEditingMatId(null); setMatForm(emptyMat); };
 
             const submitMat = async (e) => {
@@ -2098,7 +2116,7 @@
             // ── PRODUCTOS (APU) state ──
             const PROD_CATS = ['Material POP','Reconocimiento','Llavero','Libreta','Sello','Talonario','Trofeo / Medalla','Corpóreo PVC','MDF / Acrílico','Otro'];
             const emptyProd = { name:'', category:'Otro', ingredients:[], marginPct:30, notes:'' };
-            const emptyIngr = { materialId:'', qty:1 };
+            const emptyIngr = { materialId:'', qty:1, pieceW:0, pieceH:0, vinylH:0 };
             const [prodForm, setProdForm] = useState(emptyProd);
             const [editingProdId, setEditingProdId] = useState(null);
             const [showProdForm, setShowProdForm] = useState(false);
@@ -2117,11 +2135,29 @@
                 return { ...f, ingredients: ingr };
             });
 
+            const calcIngredientCost = (ing, mat) => {
+                if (!mat) return 0;
+                const cost = parseFloat(mat.costUsd)||0;
+                const mode = mat.calcMode || 'unit';
+                if (mode === 'area') {
+                    const sheetArea = (parseFloat(mat.sheetW)||1) * (parseFloat(mat.sheetH)||1);
+                    const pieceArea = (parseFloat(ing.pieceW)||0) * (parseFloat(ing.pieceH)||0);
+                    return sheetArea > 0 ? (pieceArea / sheetArea) * cost : 0;
+                }
+                if (mode === 'vinyl') {
+                    // costo por m², ancho fijo en cm, alto variable en cm
+                    const w = (parseFloat(mat.vinylWidth)||137) / 100; // a metros
+                    const h = (parseFloat(ing.vinylH)||0) / 100;       // a metros
+                    return w * h * cost;
+                }
+                // unit
+                return cost * (parseFloat(ing.qty)||0);
+            };
+
             const calcCost = (ingredients) => {
                 return (ingredients||[]).reduce((sum, ing) => {
                     const mat = materials.find(m => m.id === ing.materialId);
-                    if (!mat) return sum;
-                    return sum + (parseFloat(mat.costUsd)||0) * (parseFloat(ing.qty)||0);
+                    return sum + calcIngredientCost(ing, mat);
                 }, 0);
             };
 
@@ -2165,6 +2201,10 @@
                             <p className="text-sm text-slate-500 mt-0.5">Materiales, recetas y análisis de precio unitario</p>
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
+                            <button onClick={() => runImport(digitalPrint2, 'Digital Print 2')} disabled={!!importing}
+                                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border border-violet-200 text-violet-600 hover:bg-violet-50 rounded-xl transition disabled:opacity-50">
+                                {importing === 'Digital Print 2' ? '⏳ Importando...' : '⬇️ Digital Print 2 (Vinil)'}
+                            </button>
                             <button onClick={() => runImport(sublimacionAmericana, 'Sublimación Americana')} disabled={!!importing}
                                 className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border border-indigo-200 text-indigo-600 hover:bg-indigo-50 rounded-xl transition disabled:opacity-50">
                                 {importing === 'Sublimación Americana' ? '⏳ Importando...' : '⬇️ Sublimación Americana'}
@@ -2224,11 +2264,45 @@
                                                 </select>
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Costo USD / unidad *</label>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Costo USD *</label>
                                                 <input type="number" min="0" step="0.01" required value={matForm.costUsd}
                                                     onChange={e => setMatForm(f=>({...f,costUsd:e.target.value}))}
                                                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:border-indigo-400"/>
                                             </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Modo de cálculo</label>
+                                                <select value={matForm.calcMode} onChange={e => setMatForm(f=>({...f,calcMode:e.target.value}))}
+                                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:border-indigo-400 bg-white">
+                                                    <option value="unit">Por cantidad (unidad)</option>
+                                                    <option value="area">Por área — Lámina (acrílico, MDF)</option>
+                                                    <option value="vinyl">Por área — Vinil m² (ancho fijo)</option>
+                                                </select>
+                                            </div>
+                                            {matForm.calcMode === 'area' && (
+                                                <>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-indigo-500 uppercase mb-1">Ancho lámina (cm)</label>
+                                                    <input type="number" min="0" step="0.1" value={matForm.sheetW}
+                                                        onChange={e => setMatForm(f=>({...f,sheetW:e.target.value}))}
+                                                        placeholder="Ej: 61" className="w-full px-3 py-2 border border-indigo-200 rounded-lg text-sm focus:border-indigo-400"/>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-indigo-500 uppercase mb-1">Alto lámina (cm)</label>
+                                                    <input type="number" min="0" step="0.1" value={matForm.sheetH}
+                                                        onChange={e => setMatForm(f=>({...f,sheetH:e.target.value}))}
+                                                        placeholder="Ej: 61" className="w-full px-3 py-2 border border-indigo-200 rounded-lg text-sm focus:border-indigo-400"/>
+                                                </div>
+                                                </>
+                                            )}
+                                            {matForm.calcMode === 'vinyl' && (
+                                                <div>
+                                                    <label className="block text-xs font-bold text-indigo-500 uppercase mb-1">Ancho vinil (cm)</label>
+                                                    <input type="number" min="0" step="1" value={matForm.vinylWidth}
+                                                        onChange={e => setMatForm(f=>({...f,vinylWidth:e.target.value}))}
+                                                        placeholder="137" className="w-full px-3 py-2 border border-indigo-200 rounded-lg text-sm focus:border-indigo-400"/>
+                                                    <p className="text-xs text-slate-400 mt-1">Ancho del rollo en cm (por defecto 137)</p>
+                                                </div>
+                                            )}
                                             <div>
                                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Proveedor</label>
                                                 <input value={matForm.supplier} onChange={e => setMatForm(f=>({...f,supplier:e.target.value}))}
@@ -2373,22 +2447,56 @@
                                                     {prodForm.ingredients.map((ing, i) => {
                                                         const mat = materials.find(m => m.id === ing.materialId);
                                                         const subCost = mat ? (parseFloat(mat.costUsd)||0) * (parseFloat(ing.qty)||0) : 0;
+                                                        const mode = mat?.calcMode || 'unit';
                                                         return (
-                                                            <div key={i} className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2">
-                                                                <select value={ing.materialId} onChange={e => updateIngredient(i,'materialId',e.target.value)}
-                                                                    className="flex-1 px-2 py-1.5 border border-slate-200 rounded-md text-sm bg-white focus:border-indigo-400">
-                                                                    <option value="">— Seleccionar material —</option>
-                                                                    {materials.map(m => <option key={m.id} value={m.id}>{m.name} (${fmt(m.costUsd)}/{m.unit})</option>)}
-                                                                </select>
-                                                                <input type="number" min="0" step="0.01" value={ing.qty}
-                                                                    onChange={e => updateIngredient(i,'qty',e.target.value)}
-                                                                    className="w-20 px-2 py-1.5 border border-slate-200 rounded-md text-sm text-center focus:border-indigo-400"
-                                                                    placeholder="Cant."/>
-                                                                {mat && <span className="text-xs text-slate-400">{mat.unit}</span>}
-                                                                <span className="text-xs font-bold text-emerald-600 w-16 text-right">${fmt(subCost)}</span>
-                                                                <button type="button" onClick={() => removeIngredient(i)} className="text-red-400 hover:text-red-600 p-1">
-                                                                    <Icons.Trash2 className="w-3.5 h-3.5"/>
-                                                                </button>
+                                                            <div key={i} className="bg-slate-50 rounded-lg px-3 py-2 space-y-2">
+                                                                <div className="flex items-center gap-2">
+                                                                    <select value={ing.materialId} onChange={e => updateIngredient(i,'materialId',e.target.value)}
+                                                                        className="flex-1 px-2 py-1.5 border border-slate-200 rounded-md text-sm bg-white focus:border-indigo-400">
+                                                                        <option value="">— Seleccionar material —</option>
+                                                                        {materials.map(m => <option key={m.id} value={m.id}>{m.name} (${fmt(m.costUsd)}/{m.unit})</option>)}
+                                                                    </select>
+                                                                    <span className="text-xs font-bold text-emerald-600 w-16 text-right">${fmt(subCost)}</span>
+                                                                    <button type="button" onClick={() => removeIngredient(i)} className="text-red-400 hover:text-red-600 p-1">
+                                                                        <Icons.Trash2 className="w-3.5 h-3.5"/>
+                                                                    </button>
+                                                                </div>
+                                                                {/* Inputs según modo */}
+                                                                {mode === 'unit' && (
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-xs text-slate-400">Cantidad:</span>
+                                                                        <input type="number" min="0" step="0.01" value={ing.qty}
+                                                                            onChange={e => updateIngredient(i,'qty',e.target.value)}
+                                                                            className="w-24 px-2 py-1 border border-slate-200 rounded-md text-sm text-center focus:border-indigo-400"/>
+                                                                        {mat && <span className="text-xs text-slate-400">{mat.unit}</span>}
+                                                                    </div>
+                                                                )}
+                                                                {mode === 'area' && (
+                                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                                        <span className="text-xs text-slate-400">Pieza:</span>
+                                                                        <input type="number" min="0" step="0.1" value={ing.pieceW}
+                                                                            onChange={e => updateIngredient(i,'pieceW',e.target.value)}
+                                                                            className="w-20 px-2 py-1 border border-indigo-200 rounded-md text-sm text-center focus:border-indigo-400"
+                                                                            placeholder="Ancho"/>
+                                                                        <span className="text-xs text-slate-400">×</span>
+                                                                        <input type="number" min="0" step="0.1" value={ing.pieceH}
+                                                                            onChange={e => updateIngredient(i,'pieceH',e.target.value)}
+                                                                            className="w-20 px-2 py-1 border border-indigo-200 rounded-md text-sm text-center focus:border-indigo-400"
+                                                                            placeholder="Alto"/>
+                                                                        <span className="text-xs text-slate-400">cm</span>
+                                                                        {mat && <span className="text-xs text-slate-400 ml-1">/ Lámina: {mat.sheetW}×{mat.sheetH} cm</span>}
+                                                                    </div>
+                                                                )}
+                                                                {mode === 'vinyl' && (
+                                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                                        <span className="text-xs text-slate-400">Ancho fijo: {mat?.vinylWidth||137} cm × Alto:</span>
+                                                                        <input type="number" min="0" step="0.1" value={ing.vinylH}
+                                                                            onChange={e => updateIngredient(i,'vinylH',e.target.value)}
+                                                                            className="w-24 px-2 py-1 border border-indigo-200 rounded-md text-sm text-center focus:border-indigo-400"
+                                                                            placeholder="Alto cm"/>
+                                                                        <span className="text-xs text-slate-400">cm</span>
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         );
                                                     })}
