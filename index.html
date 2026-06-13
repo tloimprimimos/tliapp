@@ -2754,10 +2754,16 @@
                                                         {(p.ingredients||[]).map((ing, i) => {
                                                             const mat = materials.find(m => m.id === ing.materialId);
                                                             if (!mat) return null;
+                                                            const mode = mat.calcMode || 'unit';
+                                                            const ingCost = calcIngredientCost(ing, mat);
+                                                            let desc = '';
+                                                            if (mode === 'area') desc = `${ing.pieceW||0}×${ing.pieceH||0} cm`;
+                                                            else if (mode === 'vinyl') desc = `${mat.vinylWidth||137}×${ing.vinylH||0} cm`;
+                                                            else desc = `× ${ing.qty} ${mat.unit}`;
                                                             return (
                                                                 <div key={i} className="flex justify-between text-xs text-slate-500">
-                                                                    <span>▸ {mat.name} × {ing.qty} {mat.unit}</span>
-                                                                    <span className="font-medium">${fmt((parseFloat(mat.costUsd)||0)*(parseFloat(ing.qty)||0))}</span>
+                                                                    <span>▸ {mat.name} {desc && <span className="text-slate-400">({desc})</span>}</span>
+                                                                    <span className="font-medium">${fmt(ingCost)}</span>
                                                                 </div>
                                                             );
                                                         })}
