@@ -2019,14 +2019,45 @@
                 { name: 'Taza Mágica 11oz (Caja x36)',     category: 'Sublimación', unit: 'caja',   costUsd: 162.97, supplier: 'Sublimación Americana', notes: 'Caja 36 uds c/ caja blanca — Ref: CCT011' },
             ];
 
-            const runImport = async () => {
-                if (!window.confirm(`¿Cargar ${sublimacionAmericana.length} materiales de Sublimación Americana?`)) return;
-                setImporting(true);
+            const vecxel = [
+                // Acrílico Transparente 3mm
+                { name: 'Acrílico Transparente 3mm — Lámina 1,22x2,44',  category: 'Acrílico', unit: 'unidad', costUsd: 76.19, supplier: 'Vecxel', notes: 'Transparente 3mm — Lámina completa' },
+                { name: 'Acrílico Transparente 3mm — 3/4 Lámina 1,22x1,83', category: 'Acrílico', unit: 'unidad', costUsd: 62.34, supplier: 'Vecxel', notes: 'Transparente 3mm' },
+                { name: 'Acrílico Transparente 3mm — 1/2 Lámina 1,22x1,22', category: 'Acrílico', unit: 'unidad', costUsd: 41.56, supplier: 'Vecxel', notes: 'Transparente 3mm' },
+                { name: 'Acrílico Transparente 3mm — 1/4 Lámina 1,22x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 20.78, supplier: 'Vecxel', notes: 'Transparente 3mm' },
+                { name: 'Acrílico Transparente 3mm — 1/8 Lámina 0,61x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 13.85, supplier: 'Vecxel', notes: 'Transparente 3mm' },
+                // Acrílico Transparente 2mm
+                { name: 'Acrílico Transparente 2mm — Lámina 1,22x2,44',  category: 'Acrílico', unit: 'unidad', costUsd: 67.18, supplier: 'Vecxel', notes: 'Transparente 2mm — Lámina completa' },
+                { name: 'Acrílico Transparente 2mm — 3/4 Lámina 1,22x1,83', category: 'Acrílico', unit: 'unidad', costUsd: 52.25, supplier: 'Vecxel', notes: 'Transparente 2mm' },
+                { name: 'Acrílico Transparente 2mm — 1/2 Lámina 1,22x1,22', category: 'Acrílico', unit: 'unidad', costUsd: 37.32, supplier: 'Vecxel', notes: 'Transparente 2mm' },
+                { name: 'Acrílico Transparente 2mm — 1/4 Lámina 1,22x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 22.39, supplier: 'Vecxel', notes: 'Transparente 2mm' },
+                { name: 'Acrílico Transparente 2mm — 1/8 Lámina 0,61x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 14.93, supplier: 'Vecxel', notes: 'Transparente 2mm' },
+                // Acrílico Espejo Gold/Silver 2mm
+                { name: 'Acrílico Espejo Gold/Silver 2mm — Lámina 1,22x2,44',  category: 'Acrílico', unit: 'unidad', costUsd: 108.85, supplier: 'Vecxel', notes: 'Espejo Gold/Silver 2mm — Lámina completa' },
+                { name: 'Acrílico Espejo Gold/Silver 2mm — 3/4 Lámina 1,22x1,83', category: 'Acrílico', unit: 'unidad', costUsd: 85.23, supplier: 'Vecxel', notes: 'Espejo Gold/Silver 2mm' },
+                { name: 'Acrílico Espejo Gold/Silver 2mm — 1/2 Lámina 1,22x1,22', category: 'Acrílico', unit: 'unidad', costUsd: 53.87, supplier: 'Vecxel', notes: 'Espejo Gold/Silver 2mm' },
+                { name: 'Acrílico Espejo Gold/Silver 2mm — 1/4 Lámina 1,22x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 30.99, supplier: 'Vecxel', notes: 'Espejo Gold/Silver 2mm' },
+                { name: 'Acrílico Espejo Gold/Silver 2mm — 1/8 Lámina 0,61x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 15.50, supplier: 'Vecxel', notes: 'Espejo Gold/Silver 2mm' },
+                // Acrílico Espejo Gold/Silver 3mm
+                { name: 'Acrílico Espejo Gold/Silver 3mm — Lámina 1,22x2,44',  category: 'Acrílico', unit: 'unidad', costUsd: 134.89, supplier: 'Vecxel', notes: 'Espejo Gold/Silver 3mm — Lámina completa' },
+                { name: 'Acrílico Espejo Gold/Silver 3mm — 3/4 Lámina 1,22x1,83', category: 'Acrílico', unit: 'unidad', costUsd: 104.91, supplier: 'Vecxel', notes: 'Espejo Gold/Silver 3mm' },
+                { name: 'Acrílico Espejo Gold/Silver 3mm — 1/2 Lámina 1,22x1,22', category: 'Acrílico', unit: 'unidad', costUsd: 74.94, supplier: 'Vecxel', notes: 'Espejo Gold/Silver 3mm' },
+                { name: 'Acrílico Espejo Gold/Silver 3mm — 1/4 Lámina 1,22x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 44.96, supplier: 'Vecxel', notes: 'Espejo Gold/Silver 3mm' },
+                { name: 'Acrílico Espejo Gold/Silver 3mm — 1/8 Lámina 0,61x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 29.98, supplier: 'Vecxel', notes: 'Espejo Gold/Silver 3mm' },
+                // Acrílico Espejo Colores 3mm
+                { name: 'Acrílico Espejo Colores 3mm — Lámina 1,22x2,44',  category: 'Acrílico', unit: 'unidad', costUsd: 171.78, supplier: 'Vecxel', notes: 'Espejo Colores 3mm (Verde/Azul/Rojo/Morado/Rose Gold/Gris/Bronce) — Lámina completa' },
+                { name: 'Acrílico Espejo Colores 3mm — 3/4 Lámina 1,22x1,83', category: 'Acrílico', unit: 'unidad', costUsd: 133.03, supplier: 'Vecxel', notes: 'Espejo Colores 3mm' },
+                { name: 'Acrílico Espejo Colores 3mm — 1/2 Lámina 1,22x1,22', category: 'Acrílico', unit: 'unidad', costUsd: 86.54,  supplier: 'Vecxel', notes: 'Espejo Colores 3mm' },
+                { name: 'Acrílico Espejo Colores 3mm — 1/4 Lámina 1,22x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 46.49,  supplier: 'Vecxel', notes: 'Espejo Colores 3mm' },
+                { name: 'Acrílico Espejo Colores 3mm — 1/8 Lámina 0,61x0,61', category: 'Acrílico', unit: 'unidad', costUsd: 30.99,  supplier: 'Vecxel', notes: 'Espejo Colores 3mm' },
+            ];
+
+            const runImport = async (list, name) => {
+                if (!window.confirm(`¿Cargar ${list.length} materiales de ${name}?`)) return;
+                setImporting(name);
                 try {
-                    for (const mat of sublimacionAmericana) {
-                        await onSaveMaterial(mat);
-                    }
-                    toast(`✅ ${sublimacionAmericana.length} materiales importados`);
+                    for (const mat of list) await onSaveMaterial(mat);
+                    toast(`✅ ${list.length} materiales de ${name} importados`);
                 } catch(e) {
                     toast('Error al importar: ' + e.message, 'error');
                 } finally {
@@ -2134,10 +2165,13 @@
                             <p className="text-sm text-slate-500 mt-0.5">Materiales, recetas y análisis de precio unitario</p>
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
-                            {/* Botón importar */}
-                            <button onClick={runImport} disabled={importing}
+                            <button onClick={() => runImport(sublimacionAmericana, 'Sublimación Americana')} disabled={!!importing}
                                 className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border border-indigo-200 text-indigo-600 hover:bg-indigo-50 rounded-xl transition disabled:opacity-50">
-                                {importing ? '⏳ Importando...' : '⬇️ Importar Sublimación Americana'}
+                                {importing === 'Sublimación Americana' ? '⏳ Importando...' : '⬇️ Sublimación Americana'}
+                            </button>
+                            <button onClick={() => runImport(vecxel, 'Vecxel')} disabled={!!importing}
+                                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border border-emerald-200 text-emerald-600 hover:bg-emerald-50 rounded-xl transition disabled:opacity-50">
+                                {importing === 'Vecxel' ? '⏳ Importando...' : '⬇️ Vecxel (Acrílico)'}
                             </button>
                             {/* Tabs */}
                             <div className="flex gap-2 bg-slate-100 p-1 rounded-xl">
