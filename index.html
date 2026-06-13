@@ -2158,7 +2158,13 @@
                                             <div>
                                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Proveedor</label>
                                                 <input value={matForm.supplier} onChange={e => setMatForm(f=>({...f,supplier:e.target.value}))}
+                                                    list="suppliers-list"
                                                     placeholder="Nombre del proveedor" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:border-indigo-400"/>
+                                                <datalist id="suppliers-list">
+                                                    {[...new Set(materials.map(m => m.supplier).filter(Boolean))].map(s => (
+                                                        <option key={s} value={s}/>
+                                                    ))}
+                                                </datalist>
                                             </div>
                                             <div>
                                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Notas</label>
