@@ -1,5 +1,6 @@
 const CACHE = 'tliapp-v2';
-const STATIC = ['/logo.png', '/manifest.json'];
+const BASE = self.location.pathname.replace('sw.js', '');
+const STATIC = [BASE + 'logo.png', BASE + 'manifest.json'];
 
 self.addEventListener('install', e => {
     e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC)));
