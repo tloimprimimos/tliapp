@@ -1336,6 +1336,7 @@
             const [expenses, setExpenses] = useState([]);
             const [materials, setMaterials] = useState([]);
             const [products, setProducts] = useState([]);
+            const [cajitasConfig, setCajitasConfig] = useState(null);
             const [config, setConfig] = useState({
                 logo: '',
                 companyName: 'TLI - TE LO IMPRIMO',
@@ -1431,6 +1432,13 @@
                         setProducts(data.sort((a,b) => (a.name||'').localeCompare(b.name||'')));
                     });
 
+                // Load cajitas MDF calculator config
+                const unsubCajitas = db.collection('config')
+                    .doc('cajitasMDF')
+                    .onSnapshot(doc => {
+                        setCajitasConfig(doc.exists ? doc.data() : null);
+                    });
+
                 return () => {
                     unsubClients();
                     unsubQuotes();
@@ -1439,6 +1447,7 @@
                     unsubExpenses();
                     unsubMaterials();
                     unsubProducts();
+                    unsubCajitas();
                 };
             }, [user]);
 
@@ -1701,6 +1710,12 @@
                 }
             };
 
+            const saveCajitasConfig = async (data) => {
+                const clean = cleanForFirestore(data);
+                await db.collection('config').doc('cajitasMDF').set(clean);
+                setCajitasConfig(clean);
+            };
+
             const updateTaskStatus = async (taskId, newStatus) => {
                 await db.collection('tasks').doc(taskId).update({ status: newStatus });
             };
@@ -1875,6 +1890,8 @@
                                 onDeleteMaterial={deleteMaterial}
                                 onSaveProduct={saveProduct}
                                 onDeleteProduct={deleteProduct}
+                                cajitasConfig={cajitasConfig}
+                                onSaveCajitasConfig={saveCajitasConfig}
                             />
                         )}
                         {view === 'settings' && (
@@ -2172,8 +2189,8 @@
 
         // ── Expenses View ─────────────────────────────────────────────
         // ─── INVENTORY VIEW ───────────────────────────────────────────────────────
-        function InventoryView({ materials, products, onSaveMaterial, onDeleteMaterial, onSaveProduct, onDeleteProduct }) {
-            const [tab, setTab] = useState('materials'); // 'materials' | 'products'
+        function InventoryView({ materials, products, onSaveMaterial, onDeleteMaterial, onSaveProduct, onDeleteProduct, cajitasConfig, onSaveCajitasConfig }) {
+            const [tab, setTab] = useState('materials'); // 'materials' | 'products' | 'cajitas'
             const [importing, setImporting] = useState(false);
 
             const maquinas = [
@@ -2421,6 +2438,7 @@
                         <div className="flex gap-2 bg-slate-100 p-1 rounded-xl">
                             <button className={tabCls('materials')} onClick={() => setTab('materials')}>📦 Materiales</button>
                             <button className={tabCls('products')} onClick={() => setTab('products')}>🏷️ Productos (APU)</button>
+                            <button className={tabCls('cajitas')} onClick={() => setTab('cajitas')}>📐 Cajitas MDF</button>
                         </div>
                     </div>
 
@@ -2825,10 +2843,365 @@
                             )}
                         </div>
                     )}
+
+                    {/* ── TAB CAJITAS MDF ── */}
+                    {tab === 'cajitas' && (
+                        <CajitasMDFCalc config={cajitasConfig} onSave={onSaveCajitasConfig} />
+                    )}
                 </div>
             );
         }
         // ─── END INVENTORY VIEW ───────────────────────────────────────────────────
+
+        // ─── CAJITAS MDF CALC ───────────────────────────────────────────────────────
+        const CAJITAS_DEFAULTS = {
+            anchoLamina: 244,
+            altoLamina: 183,
+            tablasPorLamina: 12,
+            precioLamina: 20,
+            extras: [],
+            pegaLoca: { rinde: 3, costo: 1 },
+            piezasPorTabla: { S: 4, M: 3, L: 2 },
+            precioVenta: { S: 5, M: 0, L: 0 },
+            tablasAsignadas: { S: 5, M: 4, L: 3 },
+            numLaminas: 1,
+            maquina: { costo: 800, vidaUtilHoras: 9000, valorRescate: 0, minutosPorTabla: 45 }
+        };
+        const CAJITAS_SIZE_CLS = { S: 'text-sky-600 bg-sky-50', M: 'text-amber-600 bg-amber-50', L: 'text-orange-600 bg-orange-50' };
+
+        function CajitasMDFCalc({ config, onSave }) {
+            const [state, setState] = useState(() => ({ ...CAJITAS_DEFAULTS, ...(config||{}) }));
+            const [saving, setSaving] = useState(false);
+
+            useEffect(() => {
+                if (config) setState({ ...CAJITAS_DEFAULTS, ...config });
+            }, [config]);
+
+            const fmt = (n) => (parseFloat(n)||0).toFixed(2);
+            const num = (v) => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+
+            const setTop = (field, val) => setState(s => ({ ...s, [field]: num(val) }));
+            const setNested = (group, field, val) => setState(s => ({ ...s, [group]: { ...s[group], [field]: num(val) } }));
+
+            const addExtra = () => setState(s => ({ ...s, extras: [...s.extras, { nombre:'', costo:0 }] }));
+            const removeExtra = (i) => setState(s => ({ ...s, extras: s.extras.filter((_,idx) => idx !== i) }));
+            const updateExtra = (i, field, val) => setState(s => {
+                const extras = [...s.extras];
+                extras[i] = { ...extras[i], [field]: field === 'costo' ? num(val) : val };
+                return { ...s, extras };
+            });
+
+            const compute = () => {
+                const costoTotalLamina = num(state.precioLamina) + state.extras.reduce((acc,e) => acc + num(e.costo), 0);
+                const costoPorTabla = state.tablasPorLamina > 0 ? costoTotalLamina / state.tablasPorLamina : 0;
+                const costoPegaPorCaja = state.pegaLoca.rinde > 0 ? num(state.pegaLoca.costo) / state.pegaLoca.rinde : 0;
+
+                const depPorHora = state.maquina.vidaUtilHoras > 0
+                    ? (num(state.maquina.costo) - num(state.maquina.valorRescate)) / state.maquina.vidaUtilHoras
+                    : 0;
+                const depPorTabla = depPorHora * (num(state.maquina.minutosPorTabla) / 60);
+                const depPorLamina = depPorTabla * state.tablasPorLamina;
+
+                const filasUnaTalla = ['S','M','L'].map(talla => {
+                    const piezas = state.tablasPorLamina * num(state.piezasPorTabla[talla]);
+                    const costo = costoTotalLamina + (piezas * costoPegaPorCaja) + depPorLamina;
+                    const venta = piezas * num(state.precioVenta[talla]);
+                    const ganancia = venta - costo;
+                    const margen = venta > 0 ? (ganancia/venta)*100 : 0;
+                    return { talla, piezas, venta, costo, ganancia, margen };
+                });
+
+                const totalAsignadas = num(state.tablasAsignadas.S) + num(state.tablasAsignadas.M) + num(state.tablasAsignadas.L);
+                const sobrantes = state.tablasPorLamina - totalAsignadas;
+
+                const filasMixto = ['S','M','L'].map(talla => {
+                    const nTablas = num(state.tablasAsignadas[talla]);
+                    const piezas = nTablas * num(state.piezasPorTabla[talla]);
+                    const costo = (nTablas*costoPorTabla) + (piezas*costoPegaPorCaja) + (nTablas*depPorTabla);
+                    const venta = piezas * num(state.precioVenta[talla]);
+                    const ganancia = venta - costo;
+                    return { talla, nTablas, piezas, costo, venta, ganancia };
+                });
+
+                const mixtoTotales = filasMixto.reduce((acc,f) => ({
+                    piezas: acc.piezas+f.piezas, costo: acc.costo+f.costo, venta: acc.venta+f.venta, ganancia: acc.ganancia+f.ganancia
+                }), { piezas:0, costo:0, venta:0, ganancia:0 });
+
+                const proyeccion = {
+                    piezas: mixtoTotales.piezas * state.numLaminas,
+                    venta: mixtoTotales.venta * state.numLaminas,
+                    costo: mixtoTotales.costo * state.numLaminas,
+                    ganancia: mixtoTotales.ganancia * state.numLaminas
+                };
+
+                return { costoTotalLamina, costoPorTabla, costoPegaPorCaja, depPorHora, depPorTabla, depPorLamina, filasUnaTalla, filasMixto, mixtoTotales, sobrantes, proyeccion };
+            };
+            const d = compute();
+
+            const handleSave = async () => {
+                setSaving(true);
+                try {
+                    await onSave(state);
+                    toast('Configuración de cajitas MDF guardada');
+                } catch (e) {
+                    toast('Error al guardar: ' + e.message, 'error');
+                } finally {
+                    setSaving(false);
+                }
+            };
+
+            const inputCls = "w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:border-indigo-400";
+            const labelCls = "block text-xs font-bold text-slate-500 uppercase mb-1";
+
+            return (
+                <div>
+                    <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+                        <p className="text-sm text-slate-500">
+                            Lámina {state.anchoLamina}×{state.altoLamina} cm · {state.tablasPorLamina} tablas 90×40
+                        </p>
+                        <button onClick={handleSave} disabled={saving}
+                            className="flex items-center gap-2 px-4 py-2 text-white text-sm font-semibold rounded-xl shadow transition hover:opacity-90 disabled:opacity-50"
+                            style={{background:'linear-gradient(135deg,#6366f1,#8b5cf6)'}}>
+                            {saving ? 'Guardando...' : '💾 Guardar configuración'}
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                        {/* Lámina de MDF */}
+                        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+                            <h3 className="font-bold text-slate-700 mb-4">Lámina de MDF</h3>
+                            <div className="grid grid-cols-3 gap-3 mb-3">
+                                <div>
+                                    <label className={labelCls}>Ancho (cm)</label>
+                                    <input type="number" value={state.anchoLamina} onChange={e => setTop('anchoLamina', e.target.value)} className={inputCls}/>
+                                </div>
+                                <div>
+                                    <label className={labelCls}>Alto (cm)</label>
+                                    <input type="number" value={state.altoLamina} onChange={e => setTop('altoLamina', e.target.value)} className={inputCls}/>
+                                </div>
+                                <div>
+                                    <label className={labelCls}>Tablas 90×40 / lámina</label>
+                                    <input type="number" value={state.tablasPorLamina} onChange={e => setTop('tablasPorLamina', e.target.value)} className={inputCls}/>
+                                </div>
+                            </div>
+                            <div className="mb-4">
+                                <label className={labelCls}>Precio de la lámina ($)</label>
+                                <input type="number" step="0.01" value={state.precioLamina} onChange={e => setTop('precioLamina', e.target.value)} className={inputCls}/>
+                            </div>
+
+                            <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Pega loca — costo por caja armada</h4>
+                            <div className="flex gap-3 mb-2">
+                                <div className="flex-1">
+                                    <label className={labelCls}>Rinde (cajas)</label>
+                                    <input type="number" min="1" value={state.pegaLoca.rinde} onChange={e => setNested('pegaLoca','rinde', e.target.value)} className={inputCls}/>
+                                </div>
+                                <div className="flex-1">
+                                    <label className={labelCls}>Costo ($)</label>
+                                    <input type="number" step="0.01" value={state.pegaLoca.costo} onChange={e => setNested('pegaLoca','costo', e.target.value)} className={inputCls}/>
+                                </div>
+                            </div>
+                            <p className="text-xs text-slate-400 mb-4">Costo de pega loca por caja: <b className="text-slate-600">${fmt(d.costoPegaPorCaja)}</b> — se suma a cada caja armada.</p>
+
+                            <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Otros costos fijos por lámina completa</h4>
+                            {state.extras.map((extra, i) => (
+                                <div key={i} className="flex gap-2 items-center mb-2">
+                                    <input type="text" placeholder="Nombre (pintura, empaque...)" value={extra.nombre}
+                                        onChange={e => updateExtra(i, 'nombre', e.target.value)} className={inputCls + " flex-[2]"}/>
+                                    <input type="number" step="0.01" placeholder="$" value={extra.costo}
+                                        onChange={e => updateExtra(i, 'costo', e.target.value)} className={inputCls + " flex-1"}/>
+                                    <button onClick={() => removeExtra(i)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition">
+                                        <Icons.Trash2 className="w-4 h-4"/>
+                                    </button>
+                                </div>
+                            ))}
+                            <button onClick={addExtra} type="button"
+                                className="w-full px-3 py-2 border border-dashed border-slate-300 rounded-lg text-sm text-slate-500 hover:border-indigo-400 hover:text-indigo-600 transition">
+                                + agregar costo extra
+                            </button>
+                            <p className="text-xs text-slate-400 mt-3">
+                                Costo fijo de la lámina (sin pega loca): <b className="text-slate-600">${fmt(d.costoTotalLamina)}</b> · costo por tabla: <b className="text-slate-600">${fmt(d.costoPorTabla)}</b>
+                            </p>
+                        </div>
+
+                        {/* Piezas y precio de venta */}
+                        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+                            <h3 className="font-bold text-slate-700 mb-4">Piezas por tabla y precio de venta</h3>
+                            <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Cajas que salen de 1 tabla (90×40)</h4>
+                            <div className="grid grid-cols-3 gap-3 mb-4">
+                                {['S','M','L'].map(t => (
+                                    <div key={t}>
+                                        <div className={`inline-block px-2 py-0.5 rounded-md text-xs font-bold mb-1 ${CAJITAS_SIZE_CLS[t]}`}>{t}</div>
+                                        <input type="number" value={state.piezasPorTabla[t]} onChange={e => setNested('piezasPorTabla', t, e.target.value)} className={inputCls}/>
+                                    </div>
+                                ))}
+                            </div>
+                            <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Precio de venta por caja ($)</h4>
+                            <div className="grid grid-cols-3 gap-3 mb-4">
+                                {['S','M','L'].map(t => (
+                                    <div key={t}>
+                                        <div className={`inline-block px-2 py-0.5 rounded-md text-xs font-bold mb-1 ${CAJITAS_SIZE_CLS[t]}`}>{t}</div>
+                                        <input type="number" step="0.01" value={state.precioVenta[t]} onChange={e => setNested('precioVenta', t, e.target.value)} className={inputCls}/>
+                                    </div>
+                                ))}
+                            </div>
+                            <p className="text-xs text-slate-400">Cambia estos precios y toda la calculadora se actualiza sola — así puedes probar escenarios.</p>
+                        </div>
+
+                        {/* Depreciación máquina */}
+                        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm md:col-span-2">
+                            <h3 className="font-bold text-slate-700 mb-4">Máquina láser — depreciación</h3>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+                                <div>
+                                    <label className={labelCls}>Costo máquina ($)</label>
+                                    <input type="number" step="0.01" value={state.maquina.costo} onChange={e => setNested('maquina','costo', e.target.value)} className={inputCls}/>
+                                </div>
+                                <div>
+                                    <label className={labelCls}>Vida útil (horas)</label>
+                                    <input type="number" value={state.maquina.vidaUtilHoras} onChange={e => setNested('maquina','vidaUtilHoras', e.target.value)} className={inputCls}/>
+                                </div>
+                                <div>
+                                    <label className={labelCls}>Valor rescate ($)</label>
+                                    <input type="number" step="0.01" value={state.maquina.valorRescate} onChange={e => setNested('maquina','valorRescate', e.target.value)} className={inputCls}/>
+                                </div>
+                                <div>
+                                    <label className={labelCls}>Minutos por tabla</label>
+                                    <input type="number" value={state.maquina.minutosPorTabla} onChange={e => setNested('maquina','minutosPorTabla', e.target.value)} className={inputCls}/>
+                                </div>
+                            </div>
+                            <p className="text-xs text-slate-400">
+                                Depreciación por hora: <b className="text-slate-600">${fmt(d.depPorHora)}</b> · por tabla: <b className="text-slate-600">${fmt(d.depPorTabla)}</b> · por lámina completa: <b className="text-slate-600">${fmt(d.depPorLamina)}</b>
+                            </p>
+                        </div>
+
+                        {/* Escenario: 1 lámina, una sola talla */}
+                        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm md:col-span-2">
+                            <h3 className="font-bold text-slate-700 p-5 pb-0 mb-2">Si vendieras 1 lámina completa en una sola talla</h3>
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="bg-slate-50 border-y border-slate-100">
+                                        <th className="text-left px-4 py-2 text-xs font-bold text-slate-500 uppercase">Talla</th>
+                                        <th className="text-right px-4 py-2 text-xs font-bold text-slate-500 uppercase">Piezas / lámina</th>
+                                        <th className="text-right px-4 py-2 text-xs font-bold text-slate-500 uppercase">Venta total</th>
+                                        <th className="text-right px-4 py-2 text-xs font-bold text-slate-500 uppercase">Costo lámina</th>
+                                        <th className="text-right px-4 py-2 text-xs font-bold text-slate-500 uppercase">Ganancia</th>
+                                        <th className="text-right px-4 py-2 text-xs font-bold text-slate-500 uppercase">Margen</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {d.filasUnaTalla.map(f => (
+                                        <tr key={f.talla} className="border-b border-slate-50 last:border-0">
+                                            <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-md text-xs font-bold ${CAJITAS_SIZE_CLS[f.talla]}`}>{f.talla}</span></td>
+                                            <td className="px-4 py-3 text-right">{f.piezas}</td>
+                                            <td className="px-4 py-3 text-right">${fmt(f.venta)}</td>
+                                            <td className="px-4 py-3 text-right text-red-500">${fmt(f.costo)}</td>
+                                            <td className={`px-4 py-3 text-right font-bold ${f.ganancia>=0?'text-emerald-600':'text-red-500'}`}>${fmt(f.ganancia)}</td>
+                                            <td className={`px-4 py-3 text-right font-bold ${f.margen>=0?'text-emerald-600':'text-red-500'}`}>{fmt(f.margen)}%</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Planificador de corte mixto */}
+                        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm md:col-span-2">
+                            <h3 className="font-bold text-slate-700 mb-4">
+                                Planificador de corte mixto — reparte las {state.tablasPorLamina} tablas entre tallas
+                            </h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-2">
+                                {['S','M','L'].map(t => (
+                                    <div key={t} className="flex items-center gap-2">
+                                        <span className={`px-2 py-1 rounded-md text-xs font-bold ${CAJITAS_SIZE_CLS[t]}`}>{t}</span>
+                                        <input type="number" min="0" value={state.tablasAsignadas[t]} onChange={e => setNested('tablasAsignadas', t, e.target.value)} className={inputCls}/>
+                                        <span className="text-xs text-slate-400 whitespace-nowrap">tablas</span>
+                                    </div>
+                                ))}
+                            </div>
+                            {d.sobrantes !== 0 && (
+                                <p className="text-xs font-semibold text-amber-600 mb-3">
+                                    {d.sobrantes > 0
+                                        ? `Te quedan ${d.sobrantes} tabla(s) de las ${state.tablasPorLamina} sin asignar.`
+                                        : `Te pasaste por ${Math.abs(d.sobrantes)} tabla(s) — la lámina solo da para ${state.tablasPorLamina}.`}
+                                </p>
+                            )}
+                            <table className="w-full text-sm mb-4">
+                                <thead>
+                                    <tr className="bg-slate-50 border-y border-slate-100">
+                                        <th className="text-left px-4 py-2 text-xs font-bold text-slate-500 uppercase">Talla</th>
+                                        <th className="text-right px-4 py-2 text-xs font-bold text-slate-500 uppercase">Tablas</th>
+                                        <th className="text-right px-4 py-2 text-xs font-bold text-slate-500 uppercase">Piezas</th>
+                                        <th className="text-right px-4 py-2 text-xs font-bold text-slate-500 uppercase">Costo</th>
+                                        <th className="text-right px-4 py-2 text-xs font-bold text-slate-500 uppercase">Venta</th>
+                                        <th className="text-right px-4 py-2 text-xs font-bold text-slate-500 uppercase">Ganancia</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {d.filasMixto.map(f => (
+                                        <tr key={f.talla} className="border-b border-slate-50 last:border-0">
+                                            <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-md text-xs font-bold ${CAJITAS_SIZE_CLS[f.talla]}`}>{f.talla}</span></td>
+                                            <td className="px-4 py-3 text-right">{f.nTablas}</td>
+                                            <td className="px-4 py-3 text-right">{f.piezas}</td>
+                                            <td className="px-4 py-3 text-right text-red-500">${fmt(f.costo)}</td>
+                                            <td className="px-4 py-3 text-right">${fmt(f.venta)}</td>
+                                            <td className={`px-4 py-3 text-right font-bold ${f.ganancia>=0?'text-emerald-600':'text-red-500'}`}>${fmt(f.ganancia)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 border-t border-dashed border-slate-200 pt-4">
+                                <div className="text-center">
+                                    <p className="text-lg font-bold text-slate-700">{d.mixtoTotales.piezas}</p>
+                                    <p className="text-xs text-slate-400 uppercase">Piezas totales</p>
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-lg font-bold text-red-500">${fmt(d.mixtoTotales.costo)}</p>
+                                    <p className="text-xs text-slate-400 uppercase">Costo lámina</p>
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-lg font-bold text-slate-700">${fmt(d.mixtoTotales.venta)}</p>
+                                    <p className="text-xs text-slate-400 uppercase">Venta total</p>
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-lg font-bold text-emerald-600">${fmt(d.mixtoTotales.ganancia)}</p>
+                                    <p className="text-xs text-slate-400 uppercase">Ganancia</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Proyección de producción */}
+                        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm md:col-span-2">
+                            <h3 className="font-bold text-slate-700 mb-4">Proyección de producción</h3>
+                            <div className="flex items-center gap-3 mb-4 flex-wrap">
+                                <label className="text-sm text-slate-600 whitespace-nowrap">Si corto este mismo plan en</label>
+                                <input type="number" min="1" value={state.numLaminas} onChange={e => setTop('numLaminas', e.target.value)} className={inputCls + " max-w-24"}/>
+                                <label className="text-sm text-slate-600 whitespace-nowrap">lámina(s) de MDF...</label>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 border-t border-dashed border-slate-200 pt-4">
+                                <div className="text-center">
+                                    <p className="text-lg font-bold text-slate-700">{d.proyeccion.piezas}</p>
+                                    <p className="text-xs text-slate-400 uppercase">Piezas totales</p>
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-lg font-bold text-red-500">${fmt(d.proyeccion.costo)}</p>
+                                    <p className="text-xs text-slate-400 uppercase">Inversión total</p>
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-lg font-bold text-slate-700">${fmt(d.proyeccion.venta)}</p>
+                                    <p className="text-xs text-slate-400 uppercase">Venta total</p>
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-lg font-bold text-emerald-600">${fmt(d.proyeccion.ganancia)}</p>
+                                    <p className="text-xs text-slate-400 uppercase">Ganancia total</p>
+                                </div>
+                            </div>
+                            <p className="text-xs text-slate-400 mt-3">Usa el mismo reparto de tablas del planificador de arriba, multiplicado por el número de láminas.</p>
+                        </div>
+
+                    </div>
+                </div>
+            );
+        }
+        // ─── END CAJITAS MDF CALC ───────────────────────────────────────────────────
 
         function ExpensesView({ quotes, expenses, config, onSave, onDelete }) {
             const CATEGORIES = ['Materiales','Proveedor','Tercero','Servicios','Transporte','Nómina','Alquiler','Otro'];
