@@ -59,6 +59,25 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
+        // ── Tasa BCV: fetch compartido ────────────────────────────────
+        async function fetchBCVRateFromAPI() {
+            // Intento 1: ve.dolarapi.com
+            try {
+                const res = await fetch('https://ve.dolarapi.com/v1/dolares/oficial');
+                const json = await res.json();
+                if (res.ok && json?.promedio > 0) return parseFloat(parseFloat(json.promedio).toFixed(4));
+            } catch (_) {}
+
+            // Intento 2: pydolarve.org
+            try {
+                const res = await fetch('https://pydolarve.org/api/v1/dollar?page=bcv');
+                const json = await res.json();
+                if (res.ok && json?.price > 0) return parseFloat(parseFloat(json.price).toFixed(4));
+            } catch (_) {}
+
+            return null;
+        }
+
         // ── Toast system ──────────────────────────────────────────────
         let _setToasts = null;
         const toast = (msg, type = 'success') => {
@@ -383,24 +402,9 @@
             const handleFetchBCV = async () => {
                 setIsFetchingBCV(true);
                 try {
-                    let rate = null, updatedAt = new Date().toISOString();
-
-                    // Intento 1: ve.dolarapi.com
-                    try {
-                        const res = await fetch('https://ve.dolarapi.com/v1/dolares/oficial');
-                        const json = await res.json();
-                        if (res.ok && json?.promedio > 0) rate = parseFloat(parseFloat(json.promedio).toFixed(4));
-                    } catch (_) {}
-
-                    // Intento 2: pydolarve.org
-                    if (!rate) {
-                        const res = await fetch('https://pydolarve.org/api/v1/dollar?page=bcv');
-                        const json = await res.json();
-                        if (res.ok && json?.price > 0) rate = parseFloat(parseFloat(json.price).toFixed(4));
-                    }
-
+                    const rate = await fetchBCVRateFromAPI();
                     if (!rate) throw new Error('Ambas fuentes fallaron. Ingresa la tasa manualmente.');
-                    const updated = { ...editableConfig, bcvRate: rate, bcvRateUpdatedAt: updatedAt };
+                    const updated = { ...editableConfig, bcvRate: rate, bcvRateUpdatedAt: new Date().toISOString() };
                     setEditableConfig(updated);
                     await onSave(updated);
                     toast(`Tasa BCV actualizada: Bs ${rate.toFixed(4)} / USD`);
@@ -1297,7 +1301,7 @@
                             badge={pendingPaymentsCount} active={view === 'payments'}/>
                         <NavBtn id="expenses" label="Gastos" Icon={Icons.ShoppingCart}
                             active={view === 'expenses'}/>
-                        <NavBtn id="inventory" label="Inventario" Icon={Icons.Package}
+                        <NavBtn id="inventory" label="Calculadora de Costos" Icon={Icons.Package}
                             active={view === 'inventory'}/>
                         <NavBtn id="settings" label="Configuración" Icon={Icons.Settings}
                             active={view === 'settings'}/>
@@ -1436,6 +1440,34 @@
                     unsubMaterials();
                     unsubProducts();
                 };
+            }, [user]);
+
+            // Auto-actualizar tasa BCV: si tiene más de 4h de antigüedad, refrescar sola.
+            // También reintenta cada 4h mientras la app quede abierta.
+            useEffect(() => {
+                if (!user) return;
+
+                const refreshBCVIfStale = async () => {
+                    try {
+                        const doc = await db.collection('config').doc('company').get();
+                        const data = doc.exists ? doc.data() : {};
+                        const lastUpdate = data.bcvRateUpdatedAt ? new Date(data.bcvRateUpdatedAt) : null;
+                        const hoursSince = lastUpdate ? (Date.now() - lastUpdate.getTime()) / 3600000 : Infinity;
+                        if (hoursSince <= 4) return;
+
+                        const rate = await fetchBCVRateFromAPI();
+                        if (rate) {
+                            await db.collection('config').doc('company').set(
+                                { ...data, bcvRate: rate, bcvRateUpdatedAt: new Date().toISOString() },
+                                { merge: true }
+                            );
+                        }
+                    } catch (_) {}
+                };
+
+                refreshBCVIfStale();
+                const interval = setInterval(refreshBCVIfStale, 4 * 60 * 60 * 1000);
+                return () => clearInterval(interval);
             }, [user]);
 
             // Save functions
@@ -2381,7 +2413,7 @@
                     <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
                         <div>
                             <h1 className="text-2xl font-extrabold text-slate-800 flex items-center gap-2">
-                                <Icons.Package className="w-7 h-7 text-indigo-500"/> Inventario
+                                <Icons.Package className="w-7 h-7 text-indigo-500"/> Calculadora de Costos
                             </h1>
                             <p className="text-sm text-slate-500 mt-0.5">Materiales, recetas y análisis de precio unitario</p>
                         </div>
