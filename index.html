@@ -3642,7 +3642,11 @@
                             <option value="all">Todo el historial</option>
                             {monthOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                         </select>
-                        <span className="text-xs text-slate-400">{shownDays.length} día{shownDays.length !== 1 ? 's' : ''} con movimiento</span>
+                        <span className="text-xs text-slate-400">
+                            {shownDays.length} día{shownDays.length !== 1 ? 's' : ''} con movimiento
+                            {' · '}<span className="text-emerald-600 font-semibold">{shownDays.filter(d => d.ins.length > 0).length} con entradas</span>
+                            {' · '}<span className="text-red-500 font-semibold">{shownDays.filter(d => d.outs.length > 0).length} con salidas</span>
+                        </span>
                     </div>
 
                     {cobradosSinPagos > 0 && (
