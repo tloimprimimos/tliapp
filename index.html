@@ -203,6 +203,11 @@
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
             ),
+            CalendarDays: ({className="w-6 h-6"}) => (
+                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+            ),
             ShoppingCart: ({className="w-6 h-6"}) => (
                 <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
@@ -975,7 +980,7 @@
             const [filter, setFilter] = useState('pendiente');
             const [expandedId, setExpandedId] = useState(null);
             const [addingTo, setAddingTo] = useState(null);
-            const [payForm, setPayForm] = useState({ amount: '', date: new Date().toISOString().slice(0,10), note: '' });
+            const [payForm, setPayForm] = useState({ amount: '', date: todayLocal(), note: '' });
             const [saving, setSaving] = useState(false);
 
             const relevant = quotes.filter(q => q.status === 'aceptado' || q.status === 'cobrado');
@@ -1012,7 +1017,7 @@
                 setSaving(true);
                 try {
                     await onAddPayment(quoteId, { id: Date.now().toString(), amount: parseFloat(payForm.amount), date: payForm.date, note: payForm.note });
-                    setPayForm({ amount: '', date: new Date().toISOString().slice(0,10), note: '' });
+                    setPayForm({ amount: '', date: todayLocal(), note: '' });
                     setAddingTo(null);
                 } finally { setSaving(false); }
             };
@@ -1159,7 +1164,7 @@
                                                 </div>
                                             ) : (
                                                 <div className="flex flex-wrap gap-2">
-                                                    <button onClick={() => { setAddingTo(q.id); setPayForm({ amount:'', date:new Date().toISOString().slice(0,10), note:'' }); }}
+                                                    <button onClick={() => { setAddingTo(q.id); setPayForm({ amount:'', date:todayLocal(), note:'' }); }}
                                                         className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-lg transition-colors">
                                                         <Icons.Plus className="w-3.5 h-3.5"/>Agregar pago
                                                     </button>
@@ -1301,6 +1306,8 @@
                             badge={pendingPaymentsCount} active={view === 'payments'}/>
                         <NavBtn id="expenses" label="Gastos" Icon={Icons.ShoppingCart}
                             active={view === 'expenses'}/>
+                        <NavBtn id="cashflow" label="Flujo de Caja" Icon={Icons.CalendarDays}
+                            active={view === 'cashflow'}/>
                         <NavBtn id="inventory" label="Calculadora de Costos" Icon={Icons.Package}
                             active={view === 'inventory'}/>
                         <NavBtn id="settings" label="Configuración" Icon={Icons.Settings}
@@ -1736,6 +1743,39 @@
                 }
             };
 
+            // "Marcar cobrado": registra el saldo restante como un pago de hoy y cierra el presupuesto.
+            // (Antes solo cambiaba q.status, pero la pantalla de Cobros se calcula con los pagos,
+            // por eso el botón parecía no hacer nada.)
+            const markQuoteCobrado = async (quoteId) => {
+                const quote = quotes.find(q => q.id === quoteId);
+                if (!quote) return;
+                const sub = (quote.items||[]).reduce((s,i) => s + ((i.quantity||0)*(i.unitPrice||0)), 0);
+                const total = quote.includeIva ? sub * 1.16 : sub;
+                const paid = (quote.payments||[]).reduce((s,p) => s + (parseFloat(p.amount)||0), 0);
+                const balance = total - paid;
+                try {
+                    if (balance > 0.001) {
+                        if (!window.confirm(`¿Registrar el saldo de $${balance.toFixed(2)} como cobrado hoy y marcar como cobrado?`)) return;
+                        const payment = {
+                            id: Date.now().toString(),
+                            amount: parseFloat(balance.toFixed(4)),
+                            date: todayLocal(),
+                            note: 'Saldo — marcado como cobrado'
+                        };
+                        await db.collection('quotes').doc(quoteId).update({
+                            payments: [...(quote.payments||[]), payment],
+                            status: 'cobrado'
+                        });
+                    } else {
+                        await db.collection('quotes').doc(quoteId).update({ status: 'cobrado' });
+                    }
+                    toast('Presupuesto marcado como Cobrado');
+                } catch (err) {
+                    console.error(err);
+                    toast('No se pudo marcar como cobrado', 'error');
+                }
+            };
+
             const deletePaymentFromQuote = async (quoteId, paymentId) => {
                 const quote = quotes.find(q => q.id === quoteId);
                 if (!quote) return;
@@ -1869,9 +1909,12 @@
                                 quotes={quotes}
                                 onAddPayment={addPaymentToQuote}
                                 onDeletePayment={deletePaymentFromQuote}
-                                onMarkCobrado={(id) => updateQuoteStatus(id, 'cobrado')}
+                                onMarkCobrado={markQuoteCobrado}
                                 onViewQuote={(q) => { setCurrentQuote(q); setView('quote'); }}
                             />
+                        )}
+                        {view === 'cashflow' && (
+                            <CashFlowView quotes={quotes} expenses={expenses} onViewQuote={(q) => { setCurrentQuote(q); setView('quote'); }} />
                         )}
                         {view === 'expenses' && (
                             <ExpensesView
@@ -1900,6 +1943,16 @@
                     </div>
                 </div>
             );
+        }
+
+        // Vendedores disponibles en el presupuesto
+        const SELLERS = ['Jesus Lopez', 'Angely Ramos'];
+
+        // Fecha de hoy en hora LOCAL (YYYY-MM-DD). toISOString() usa UTC y en Venezuela
+        // después de las 8pm devolvería el día siguiente.
+        function todayLocal() {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
         }
 
         // Función para normalizar fechas (soporta múltiples formatos)
@@ -3228,8 +3281,23 @@
             const [saving, setSaving] = useState(false);
             const [currency, setCurrency] = useState('USD');
             const bcvRate = config?.bcvRate || 0;
-            const emptyForm = { date: now.toISOString().slice(0,10), amount: '', category: 'Materiales', description: '', to: '' };
+            const emptyForm = { date: todayLocal(), amount: '', category: 'Materiales', description: '', to: '' };
             const [form, setForm] = useState(emptyForm);
+
+            // Beneficiarios frecuentes: se arman solos con los nombres ya usados en gastos
+            // anteriores (los más usados primero).
+            const payees = (() => {
+                const counts = {};
+                const display = {};
+                expenses.forEach(e => {
+                    const name = (e.to || '').trim();
+                    if (!name) return;
+                    const k = name.toLowerCase();
+                    counts[k] = (counts[k] || 0) + 1;
+                    if (!display[k]) display[k] = name;
+                });
+                return Object.keys(counts).sort((a, b) => counts[b] - counts[a]).map(k => display[k]);
+            })();
 
             const matchMonth = (dateStr) => {
                 if (!dateStr) return false;
@@ -3377,8 +3445,22 @@
                                 <div>
                                     <label className="text-xs font-semibold text-slate-500 mb-1 block">A quién se pagó</label>
                                     <input value={form.to} onChange={e => setForm(f => ({...f, to: e.target.value}))}
+                                        list="payees-list"
                                         placeholder="Proveedor, persona, empresa..."
                                         className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-300"/>
+                                    <datalist id="payees-list">
+                                        {payees.map(p => <option key={p} value={p}/>)}
+                                    </datalist>
+                                    {payees.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5 mt-2">
+                                            {payees.slice(0, 8).map(p => (
+                                                <button key={p} type="button" onClick={() => setForm(f => ({...f, to: p}))}
+                                                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${form.to === p ? 'bg-red-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-red-100'}`}>
+                                                    {p}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                                 <div>
                                     <label className="text-xs font-semibold text-slate-500 mb-1 block">Monto *</label>
@@ -3467,6 +3549,171 @@
                                 </div>
                             </div>
                         ))}
+                    </div>
+                </div>
+            );
+        }
+
+        // Flujo de caja diario: entradas (pagos registrados en Cobros) vs salidas (Gastos), por día
+        function CashFlowView({ quotes, expenses, onViewQuote }) {
+            const mesesNombres = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+            const money = (n) => `${n < 0 ? '-' : ''}$${Math.abs(n).toFixed(2)}`;
+            const todayStr = todayLocal();
+            const [period, setPeriod] = useState(todayStr.slice(0,7)); // 'YYYY-MM' o 'all'
+            const [openDay, setOpenDay] = useState(todayStr);
+
+            // Entradas: cada pago registrado en un presupuesto
+            const incomes = [];
+            quotes.forEach(q => (q.payments || []).forEach(p => {
+                const amount = parseFloat(p.amount) || 0;
+                if (p.date && amount > 0) incomes.push({ date: p.date, amount, quote: q, note: p.note });
+            }));
+            // Salidas: cada gasto
+            const outflows = expenses
+                .filter(e => e.date && (parseFloat(e.amount) || 0) > 0)
+                .map(e => ({ date: e.date, amount: parseFloat(e.amount) || 0, exp: e }));
+
+            // Agrupar por día
+            const byDay = {};
+            const dayOf = (d) => (byDay[d] = byDay[d] || { date: d, ins: [], outs: [], totalIn: 0, totalOut: 0 });
+            incomes.forEach(i => { const d = dayOf(i.date); d.ins.push(i); d.totalIn += i.amount; });
+            outflows.forEach(o => { const d = dayOf(o.date); d.outs.push(o); d.totalOut += o.amount; });
+
+            // Acumulado histórico (orden cronológico)
+            const allDays = Object.values(byDay).sort((a, b) => a.date.localeCompare(b.date));
+            let running = 0;
+            allDays.forEach(d => { running += d.totalIn - d.totalOut; d.balance = running; });
+
+            const shownDays = allDays
+                .filter(d => period === 'all' || d.date.startsWith(period))
+                .sort((a, b) => b.date.localeCompare(a.date));
+
+            const totalIn  = shownDays.reduce((s, d) => s + d.totalIn, 0);
+            const totalOut = shownDays.reduce((s, d) => s + d.totalOut, 0);
+            const net = totalIn - totalOut;
+
+            // Opciones de mes
+            const monthOptions = [];
+            const first = allDays.length ? allDays[0].date.slice(0,7) : todayStr.slice(0,7);
+            let [y, m] = first.split('-').map(Number);
+            const [ey, em] = todayStr.slice(0,7).split('-').map(Number);
+            while (y < ey || (y === ey && m <= em)) {
+                monthOptions.unshift({ value: `${y}-${String(m).padStart(2,'0')}`, label: `${mesesNombres[m-1]} ${y}` });
+                m++; if (m > 12) { m = 1; y++; }
+            }
+
+            const fmtDay = (iso) => {
+                const [yy, mm, dd] = iso.split('-').map(Number);
+                const dias = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+                const wd = dias[new Date(yy, mm - 1, dd).getDay()];
+                return `${wd} ${String(dd).padStart(2,'0')}/${String(mm).padStart(2,'0')}/${yy}`;
+            };
+
+            const cobradosSinPagos = quotes.filter(q => q.status === 'cobrado' && !(q.payments || []).length).length;
+
+            return (
+                <div className="max-w-4xl mx-auto p-6">
+                    <div className="mb-6">
+                        <h1 className="text-3xl font-bold text-slate-800">Flujo de Caja</h1>
+                        <p className="text-slate-500 mt-1">Cuánto entró y cuánto salió cada día</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div className="rounded-2xl p-5 text-white" style={{background:'linear-gradient(135deg,#10b981,#059669)'}}>
+                            <p className="text-xs font-bold opacity-70 uppercase tracking-widest mb-1">Entradas</p>
+                            <p className="text-3xl font-extrabold">{money(totalIn)}</p>
+                            <p className="text-xs opacity-60 mt-1">cobros registrados</p>
+                        </div>
+                        <div className="rounded-2xl p-5 text-white" style={{background:'linear-gradient(135deg,#ef4444,#dc2626)'}}>
+                            <p className="text-xs font-bold opacity-70 uppercase tracking-widest mb-1">Salidas</p>
+                            <p className="text-3xl font-extrabold">{money(totalOut)}</p>
+                            <p className="text-xs opacity-60 mt-1">gastos registrados</p>
+                        </div>
+                        <div className="rounded-2xl p-5 text-white" style={{background: net >= 0 ? 'linear-gradient(135deg,#4f46e5,#7c3aed)' : 'linear-gradient(135deg,#f59e0b,#d97706)'}}>
+                            <p className="text-xs font-bold opacity-70 uppercase tracking-widest mb-1">Neto del período</p>
+                            <p className="text-3xl font-extrabold">{money(net)}</p>
+                            <p className="text-xs opacity-60 mt-1">{net >= 0 ? 'Entró más de lo que salió' : 'Salió más de lo que entró'}</p>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-3 mb-4 items-center">
+                        <select value={period} onChange={e => setPeriod(e.target.value)}
+                            className="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                            <option value="all">Todo el historial</option>
+                            {monthOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </select>
+                        <span className="text-xs text-slate-400">{shownDays.length} día{shownDays.length !== 1 ? 's' : ''} con movimiento</span>
+                    </div>
+
+                    {cobradosSinPagos > 0 && (
+                        <div className="mb-4 px-4 py-3 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700">
+                            {cobradosSinPagos} presupuesto{cobradosSinPagos !== 1 ? 's' : ''} marcado{cobradosSinPagos !== 1 ? 's' : ''} como cobrado sin pagos registrados no aparece{cobradosSinPagos !== 1 ? 'n' : ''} aquí (no tienen fecha de cobro). Entra en Cobros y agrega el pago para que cuente.
+                        </div>
+                    )}
+
+                    <div className="space-y-2">
+                        {shownDays.length === 0 && (
+                            <div className="text-center py-16 text-slate-400">
+                                <p className="text-5xl mb-3">📅</p>
+                                <p className="font-semibold">No hay movimientos en este período</p>
+                            </div>
+                        )}
+                        {shownDays.map(d => {
+                            const dayNet = d.totalIn - d.totalOut;
+                            const isOpen = openDay === d.date;
+                            return (
+                                <div key={d.date} className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
+                                    <button onClick={() => setOpenDay(isOpen ? null : d.date)}
+                                        className="w-full px-4 py-3 flex items-center gap-4 text-left hover:bg-slate-50 transition-colors">
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-semibold text-slate-800 text-sm">{fmtDay(d.date)}{d.date === todayStr && <span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-indigo-100 text-indigo-700">Hoy</span>}</p>
+                                            <p className="text-xs text-slate-400 mt-0.5">{d.ins.length} cobro{d.ins.length !== 1 ? 's' : ''} · {d.outs.length} gasto{d.outs.length !== 1 ? 's' : ''}</p>
+                                        </div>
+                                        <div className="text-right text-xs flex-shrink-0">
+                                            <p className="text-emerald-600 font-semibold">+ {money(d.totalIn)}</p>
+                                            <p className="text-red-500 font-semibold">− {money(d.totalOut)}</p>
+                                        </div>
+                                        <div className="text-right flex-shrink-0 w-24">
+                                            <p className={`font-bold ${dayNet >= 0 ? 'text-slate-800' : 'text-amber-600'}`}>{money(dayNet)}</p>
+                                            <p className="text-xs text-slate-400">acum. {money(d.balance)}</p>
+                                        </div>
+                                    </button>
+                                    {isOpen && (
+                                        <div className="border-t border-slate-100 px-4 py-3 bg-slate-50 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <p className="text-xs font-bold text-emerald-700 uppercase tracking-widest mb-2">Entradas</p>
+                                                {d.ins.length === 0 && <p className="text-xs text-slate-400">Sin cobros</p>}
+                                                {d.ins.map((i, idx) => (
+                                                    <div key={idx} className="flex items-start justify-between gap-2 py-1.5 border-b border-slate-100 last:border-0">
+                                                        <div className="min-w-0">
+                                                            <p className="text-sm text-slate-700 truncate">{i.quote.client?.name || 'Sin cliente'}</p>
+                                                            <p className="text-xs text-slate-400">
+                                                                <button onClick={() => onViewQuote(i.quote)} className="underline hover:text-indigo-600">#{i.quote.number}</button>
+                                                                {i.note ? ` · ${i.note}` : ''}
+                                                            </p>
+                                                        </div>
+                                                        <span className="text-sm font-bold text-emerald-600 flex-shrink-0">{money(i.amount)}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div>
+                                                <p className="text-xs font-bold text-red-600 uppercase tracking-widest mb-2">Salidas</p>
+                                                {d.outs.length === 0 && <p className="text-xs text-slate-400">Sin gastos</p>}
+                                                {d.outs.map((o, idx) => (
+                                                    <div key={idx} className="flex items-start justify-between gap-2 py-1.5 border-b border-slate-100 last:border-0">
+                                                        <div className="min-w-0">
+                                                            <p className="text-sm text-slate-700 truncate">{o.exp.description}</p>
+                                                            <p className="text-xs text-slate-400">{[o.exp.to, o.exp.category].filter(Boolean).join(' · ')}</p>
+                                                        </div>
+                                                        <span className="text-sm font-bold text-red-600 flex-shrink-0">{money(o.amount)}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             );
@@ -4777,13 +5024,17 @@
                             </div>
                             <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-2">Vendedor</label>
-                                <input
-                                    type="text"
-                                    value={formData.seller}
+                                <select
+                                    value={formData.seller || ''}
                                     onChange={(e) => setFormData({ ...formData, seller: e.target.value })}
                                     className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    placeholder="Nombre del vendedor"
-                                />
+                                >
+                                    <option value="">Seleccionar vendedor...</option>
+                                    {SELLERS.map(n => <option key={n} value={n}>{n}</option>)}
+                                    {formData.seller && !SELLERS.includes(formData.seller) && (
+                                        <option value={formData.seller}>{formData.seller}</option>
+                                    )}
+                                </select>
                             </div>
                         </div>
 
