@@ -1355,6 +1355,8 @@
                             active={view === 'expenses'}/>
                         <NavBtn id="cashflow" label="Flujo de Caja" Icon={Icons.CalendarDays}
                             active={view === 'cashflow'}/>
+                        <NavBtn id="commissions" label="Comisiones" Icon={Icons.TrendingUp}
+                            active={view === 'commissions'}/>
                         <NavBtn id="inventory" label="Calculadora de Costos" Icon={Icons.Package}
                             active={view === 'inventory'}/>
                         <NavBtn id="settings" label="Configuración" Icon={Icons.Settings}
@@ -1578,7 +1580,7 @@
 
                 // Los pagos se gestionan SOLO desde Cobros: al guardar el presupuesto no se tocan
                 // (así no se pisan ni se "resucitan" pagos borrados con una copia vieja del formulario)
-                const { id, payments: _ignoredPayments, ...data } = quote;
+                const { id, payments: _ignoredPayments, commissionPaid: _ignoredCommission, ...data } = quote;
                 const cleanData = cleanForFirestore(data);
 
                 let quoteId = id;
@@ -1646,7 +1648,7 @@
                 const prefix = `${year}-${month}${day}`;
                 const count = quotes.filter(q => (q.number || '').startsWith(prefix)).length;
                 // Al duplicar NO se copian los pagos: pertenecen al presupuesto original
-                const { id, payments: _ignoredPayments, ...data } = quote;
+                const { id, payments: _ignoredPayments, commissionPaid: _ignoredCommission, ...data } = quote;
                 const newQuote = {
                     ...data,
                     number: `${prefix}${count + 1}`,
@@ -1841,6 +1843,16 @@
                 return quote.status;
             };
 
+            // Marca/desmarca comisiones pagadas (value null = quitar la marca)
+            const applyCommissionUpdates = async (updates, okMessage) => {
+                const batch = db.batch();
+                updates.forEach(u => batch.update(db.collection('quotes').doc(u.id), {
+                    commissionPaid: u.value === null ? firebase.firestore.FieldValue.delete() : u.value
+                }));
+                await batch.commit();
+                toast(okMessage || 'Comisiones actualizadas');
+            };
+
             const deletePaymentFromQuote = async (quoteId, paymentId) => {
                 const quote = quotes.find(q => q.id === quoteId);
                 if (!quote) return;
@@ -1988,6 +2000,14 @@
                                 onDeletePayment={deletePaymentFromQuote}
                                 onMarkCobrado={markQuoteCobrado}
                                 onViewQuote={(q) => { setCurrentQuote(q); setView('quote'); }}
+                            />
+                        )}
+                        {view === 'commissions' && (
+                            <CommissionsView
+                                quotes={quotes}
+                                config={config}
+                                onApply={applyCommissionUpdates}
+                                onSaveRate={async (r) => { await saveConfigData({ ...config, commissionRate: r }); toast(`Porcentaje de comisión: ${r}%`); }}
                             />
                         )}
                         {view === 'cashflow' && (
@@ -3643,6 +3663,284 @@
                             </div>
                         ))}
                     </div>
+                </div>
+            );
+        }
+
+        // Comisiones: % sobre lo vendido SIN IVA (presupuestos aceptados/cobrados), sin importar el vendedor.
+        // Cada presupuesto se marca como "comisión pagada" (quote.commissionPaid) para no pagarlo dos veces
+        // y para que una venta aceptada tarde aparezca en el siguiente cierre aunque su fecha sea de un mes ya cerrado.
+        function CommissionsView({ quotes, config, onApply, onSaveRate }) {
+            const mesesNombres = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+            const SOLD = ['aceptado', 'cobrado', 'pagado'];
+            const cfgRate = parseFloat(config?.commissionRate);
+            const RATE = !isNaN(cfgRate) && cfgRate > 0 ? cfgRate : 1;
+            const todayStr = todayLocal();
+            const thisMonth = todayStr.slice(0, 7);
+            const money = (n) => `${n < 0 ? '-' : ''}$${Math.abs(n).toFixed(2)}`;
+            const monthLabel = (ym) => ym ? `${mesesNombres[parseInt(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}` : 'Sin fecha';
+
+            const [tab, setTab] = useState('pending');
+            const [unchecked, setUnchecked] = useState({});
+            const [rateInput, setRateInput] = useState(String(RATE));
+            const [busy, setBusy] = useState(false);
+            const [catchUp, setCatchUp] = useState('');
+
+            const subOf = (q) => (q.items || []).reduce((s, i) => s + ((i.quantity || 0) * (i.unitPrice || 0)), 0);
+            const monthOf = (q) => {
+                const d = parseQuoteDate(q.date);
+                return d && !isNaN(d) ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` : '';
+            };
+            const dateKey = (q) => { const d = parseQuoteDate(q.date); return d && !isNaN(d) ? d.getTime() : 0; };
+
+            // Por pagar: vendido y aún sin comisión pagada (de cualquier mes)
+            const pending = quotes
+                .filter(q => SOLD.includes(q.status) && !q.commissionPaid && subOf(q) > 0)
+                .sort((a, b) => dateKey(a) - dateKey(b));
+            const selected = pending.filter(q => !unchecked[q.id]);
+            const pendingSum = selected.reduce((s, q) => s + subOf(q) * RATE / 100, 0);
+
+            // Ajustes: ya pagadas, pero la venta cambió (se cayó o cambió el monto)
+            const paid = quotes.filter(q => q.commissionPaid);
+            const adjustments = paid.map(q => {
+                const cp = q.commissionPaid;
+                const stillSold = SOLD.includes(q.status);
+                const expected = stillSold ? subOf(q) * ((cp.rate ?? RATE)) / 100 : 0;
+                return { q, cp, stillSold, expected, diff: expected - (parseFloat(cp.amount) || 0) };
+            }).filter(a => Math.abs(a.diff) > 0.005);
+            const adjSum = adjustments.reduce((s, a) => s + a.diff, 0);
+            const netToPay = pendingSum + adjSum;
+
+            const paidThisMonth = paid.filter(q => q.commissionPaid.month === thisMonth)
+                .reduce((s, q) => s + (parseFloat(q.commissionPaid.amount) || 0), 0);
+
+            // Historial agrupado por mes de pago
+            const history = (() => {
+                const map = {};
+                paid.forEach(q => {
+                    const k = q.commissionPaid.month || '';
+                    map[k] = map[k] || { month: k, items: [], total: 0 };
+                    map[k].items.push(q);
+                    map[k].total += parseFloat(q.commissionPaid.amount) || 0;
+                });
+                return Object.values(map).sort((a, b) => b.month.localeCompare(a.month));
+            })();
+
+            // Puesta al día (una sola vez): marcar como ya pagadas las ventas de meses que ya se cerraron
+            const oldMonths = [...new Set(pending.map(monthOf).filter(m => m && m < thisMonth))].sort();
+            const catchUpMonth = oldMonths.includes(catchUp) ? catchUp : (oldMonths[oldMonths.length - 1] || '');
+            const markUpTo = async () => {
+                if (busy || !catchUpMonth) return;
+                const list = pending.filter(q => { const m = monthOf(q); return m && m <= catchUpMonth; });
+                const total = list.reduce((s, q) => s + subOf(q) * RATE / 100, 0);
+                if (!window.confirm(`¿Marcar como YA PAGADAS las comisiones de ${list.length} venta${list.length !== 1 ? 's' : ''} hasta ${monthLabel(catchUpMonth)} (${money(total)} en total)?
+
+Esto no mueve dinero: solo las saca de "Por pagar".`)) return;
+                setBusy(true);
+                try {
+                    await onApply(list.map(q => ({ id: q.id, value: {
+                        month: catchUpMonth, date: todayStr, rate: RATE, subtotal: subOf(q),
+                        amount: parseFloat((subOf(q) * RATE / 100).toFixed(4)), previous: true
+                    } })), `${list.length} venta${list.length !== 1 ? 's' : ''} marcada${list.length !== 1 ? 's' : ''} como ya pagada${list.length !== 1 ? 's' : ''}`);
+                } catch (e) {
+                    console.error(e); toast('No se pudo marcar', 'error');
+                } finally { setBusy(false); }
+            };
+
+            const closePeriod = async () => {
+                if (busy) return;
+                if (!selected.length && !adjustments.length) { toast('No hay nada que registrar', 'warning'); return; }
+                if (netToPay <= 0.005) {
+                    toast('Los ajustes superan las comisiones nuevas: no hay pago este cierre. El saldo se acumula para el próximo.', 'warning');
+                    return;
+                }
+                const msg = `¿Registrar el pago de comisiones por ${money(netToPay)}?\n\n` +
+                    `${selected.length} venta${selected.length !== 1 ? 's' : ''} nueva${selected.length !== 1 ? 's' : ''}: ${money(pendingSum)}` +
+                    (adjustments.length ? `\n${adjustments.length} ajuste${adjustments.length !== 1 ? 's' : ''}: ${money(adjSum)}` : '');
+                if (!window.confirm(msg)) return;
+                setBusy(true);
+                try {
+                    const updates = [];
+                    selected.forEach(q => updates.push({ id: q.id, value: {
+                        month: thisMonth, date: todayStr, rate: RATE, subtotal: subOf(q), amount: parseFloat((subOf(q) * RATE / 100).toFixed(4))
+                    } }));
+                    adjustments.forEach(a => updates.push({ id: a.q.id, value: a.stillSold
+                        ? { ...a.cp, amount: parseFloat(a.expected.toFixed(4)), subtotal: subOf(a.q), adjustedAt: todayStr }
+                        : null }));
+                    await onApply(updates, `Comisiones registradas: ${money(netToPay)}`);
+                    setUnchecked({});
+                } catch (e) {
+                    console.error(e); toast('No se pudo registrar el pago de comisiones', 'error');
+                } finally { setBusy(false); }
+            };
+
+            const undo = async (q) => {
+                if (!window.confirm(`¿Quitar la marca de comisión pagada de #${q.number}? Volverá a aparecer en "Por pagar".`)) return;
+                try { await onApply([{ id: q.id, value: null }], 'Marca de comisión quitada'); }
+                catch (e) { console.error(e); toast('No se pudo deshacer', 'error'); }
+            };
+
+            const saveRate = () => {
+                const r = parseFloat(String(rateInput).replace(',', '.'));
+                if (isNaN(r) || r <= 0 || r > 100) { toast('Ingresa un porcentaje válido', 'warning'); return; }
+                onSaveRate(r);
+            };
+
+            return (
+                <div className="max-w-4xl mx-auto p-6">
+                    <div className="mb-6">
+                        <h1 className="text-3xl font-bold text-slate-800">Comisiones</h1>
+                        <p className="text-slate-500 mt-1">{RATE}% de lo vendido sin IVA · sin importar el vendedor</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div className="rounded-2xl p-5 text-white" style={{background:'linear-gradient(135deg,#f59e0b,#d97706)'}}>
+                            <p className="text-xs font-bold opacity-70 uppercase tracking-widest mb-1">Por pagar</p>
+                            <p className="text-3xl font-extrabold">{money(netToPay)}</p>
+                            <p className="text-xs opacity-60 mt-1">{selected.length} venta{selected.length !== 1 ? 's' : ''}{adjustments.length ? ` · ${adjustments.length} ajuste${adjustments.length !== 1 ? 's' : ''}` : ''}</p>
+                        </div>
+                        <div className="rounded-2xl p-5 text-white" style={{background:'linear-gradient(135deg,#10b981,#059669)'}}>
+                            <p className="text-xs font-bold opacity-70 uppercase tracking-widest mb-1">Pagado · {monthLabel(thisMonth)}</p>
+                            <p className="text-3xl font-extrabold">{money(paidThisMonth)}</p>
+                            <p className="text-xs opacity-60 mt-1">comisiones registradas este mes</p>
+                        </div>
+                        <div className="rounded-2xl p-5 bg-white border border-slate-100 shadow-sm">
+                            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Porcentaje</p>
+                            <div className="flex items-center gap-2">
+                                <input value={rateInput} onChange={e => setRateInput(e.target.value)} inputMode="decimal"
+                                    className="w-20 px-3 py-1.5 border border-slate-200 rounded-lg text-lg font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-300"/>
+                                <span className="text-lg font-bold text-slate-500">%</span>
+                                {parseFloat(String(rateInput).replace(',', '.')) !== RATE && (
+                                    <button onClick={saveRate} className="px-3 py-1.5 text-xs font-semibold text-white rounded-lg" style={{background:'linear-gradient(135deg,#f59e0b,#d97706)'}}>Guardar</button>
+                                )}
+                            </div>
+                            <p className="text-xs text-slate-400 mt-1">Cambiarlo no afecta lo ya pagado</p>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit mb-5">
+                        {[['pending', 'Por pagar'], ['history', 'Ya pagadas']].map(([v, l]) => (
+                            <button key={v} onClick={() => setTab(v)}
+                                className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${tab === v ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>{l}</button>
+                        ))}
+                    </div>
+
+                    {tab === 'pending' && (
+                        <>
+                            {oldMonths.length > 0 && (
+                                <div className="mb-4 bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                                    <p className="text-sm font-semibold text-slate-700 mb-1">¿Ya pagaste las comisiones de meses anteriores?</p>
+                                    <p className="text-xs text-slate-500 mb-3">Hay ventas de meses cerrados que aún no están marcadas como pagadas. Si ya les pagaste esas comisiones, márcalas aquí para que no se cuenten otra vez.</p>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className="text-xs text-slate-500">Ya pagué hasta</span>
+                                        <select value={catchUpMonth} onChange={e => setCatchUp(e.target.value)}
+                                            className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-300">
+                                            {oldMonths.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
+                                        </select>
+                                        <button onClick={markUpTo} disabled={busy}
+                                            className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 rounded-lg disabled:opacity-50">
+                                            Marcar como pagadas
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {adjustments.length > 0 && (
+                                <div className="mb-4 bg-amber-50 border border-amber-100 rounded-2xl p-4">
+                                    <p className="text-xs font-bold text-amber-700 uppercase tracking-widest mb-2">Ajustes de comisiones ya pagadas</p>
+                                    {adjustments.map(a => (
+                                        <div key={a.q.id} className="flex items-center justify-between gap-3 py-1.5 border-b border-amber-100 last:border-0 text-sm">
+                                            <div className="min-w-0">
+                                                <p className="text-slate-700 truncate">#{a.q.number} · {a.q.client?.name || 'Sin cliente'}</p>
+                                                <p className="text-xs text-amber-700">
+                                                    {a.stillSold
+                                                        ? `El monto cambió: se pagó ${money(parseFloat(a.cp.amount) || 0)}, ahora corresponde ${money(a.expected)}`
+                                                        : `Ya no es una venta (${a.q.status}): se pagó ${money(parseFloat(a.cp.amount) || 0)}, descontar`}
+                                                </p>
+                                            </div>
+                                            <span className={`font-bold flex-shrink-0 ${a.diff < 0 ? 'text-red-600' : 'text-emerald-600'}`}>{a.diff > 0 ? '+' : ''}{money(a.diff)}</span>
+                                        </div>
+                                    ))}
+                                    <p className="text-xs text-amber-700 mt-2">Se suman o restan al registrar el pago de comisiones.</p>
+                                </div>
+                            )}
+
+                            {pending.length === 0 && adjustments.length === 0 && (
+                                <div className="text-center py-16 text-slate-400">
+                                    <p className="text-5xl mb-3">✅</p>
+                                    <p className="font-semibold">No hay comisiones por pagar</p>
+                                </div>
+                            )}
+
+                            <div className="space-y-2">
+                                {pending.map(q => {
+                                    const ym = monthOf(q);
+                                    const old = ym && ym < thisMonth;
+                                    const on = !unchecked[q.id];
+                                    return (
+                                        <label key={q.id} className={`bg-white border rounded-2xl shadow-sm px-4 py-3 flex items-center gap-3 cursor-pointer ${on ? 'border-slate-100' : 'border-slate-100 opacity-50'}`}>
+                                            <input type="checkbox" checked={on}
+                                                onChange={() => setUnchecked(u => ({ ...u, [q.id]: on }))}
+                                                className="w-4 h-4 accent-amber-600 flex-shrink-0"/>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="font-semibold text-slate-800 text-sm truncate">{q.client?.name || 'Sin cliente'}</span>
+                                                    <span className="text-xs text-slate-400">#{q.number}</span>
+                                                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${old ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>{monthLabel(ym)}</span>
+                                                </div>
+                                                <p className="text-xs text-slate-400 mt-0.5">Venta sin IVA: {money(subOf(q))}{q.seller ? ` · ${q.seller}` : ''}</p>
+                                            </div>
+                                            <span className="font-bold text-amber-600 flex-shrink-0">{money(subOf(q) * RATE / 100)}</span>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+
+                            {(pending.length > 0 || adjustments.length > 0) && (
+                                <div className="mt-5 flex items-center justify-between gap-3 bg-white border border-slate-100 rounded-2xl shadow-sm px-4 py-3">
+                                    <div>
+                                        <p className="text-xs text-slate-400">Total a pagar</p>
+                                        <p className="text-xl font-extrabold text-slate-800">{money(netToPay)}</p>
+                                        {netToPay <= 0.005 && <p className="text-xs text-amber-600 mt-0.5">Los ajustes superan las comisiones nuevas: no hay pago este cierre, el saldo se acumula.</p>}
+                                    </div>
+                                    <button onClick={closePeriod} disabled={busy}
+                                        className="px-5 py-2.5 text-sm font-semibold text-white rounded-xl disabled:opacity-50"
+                                        style={{background:'linear-gradient(135deg,#f59e0b,#d97706)'}}>
+                                        {busy ? 'Registrando...' : 'Registrar pago de comisiones'}
+                                    </button>
+                                </div>
+                            )}
+                        </>
+                    )}
+
+                    {tab === 'history' && (
+                        <div className="space-y-4">
+                            {history.length === 0 && (
+                                <div className="text-center py-16 text-slate-400">
+                                    <p className="text-5xl mb-3">🧾</p>
+                                    <p className="font-semibold">Aún no hay comisiones registradas como pagadas</p>
+                                </div>
+                            )}
+                            {history.map(g => (
+                                <div key={g.month} className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
+                                    <div className="px-4 py-3 flex items-center justify-between bg-slate-50 border-b border-slate-100">
+                                        <p className="font-bold text-slate-800 text-sm">Pagado en {monthLabel(g.month)} <span className="text-xs font-normal text-slate-400">· {g.items.length} venta{g.items.length !== 1 ? 's' : ''}</span></p>
+                                        <p className="font-extrabold text-emerald-600">{money(g.total)}</p>
+                                    </div>
+                                    {g.items.map(q => (
+                                        <div key={q.id} className="px-4 py-2 flex items-center gap-3 border-b border-slate-50 last:border-0">
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm text-slate-700 truncate">{q.client?.name || 'Sin cliente'} <span className="text-xs text-slate-400">#{q.number} · {monthLabel(monthOf(q))}</span></p>
+                                                <p className="text-xs text-slate-400">Venta sin IVA {money(parseFloat(q.commissionPaid.subtotal) || subOf(q))} · {q.commissionPaid.rate ?? RATE}% · pagado el {q.commissionPaid.date}</p>
+                                            </div>
+                                            <span className="font-semibold text-slate-700 flex-shrink-0">{money(parseFloat(q.commissionPaid.amount) || 0)}</span>
+                                            <button onClick={() => undo(q)} className="text-xs text-slate-400 hover:text-red-500 underline flex-shrink-0">Deshacer</button>
+                                        </div>
+                                    ))}
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             );
         }
