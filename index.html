@@ -4476,17 +4476,14 @@ Esto no mueve dinero: solo las saca de "Por pagar".`)) return;
                     {/* Header */}
                     <div className="mb-6">
                         <h1 className="text-3xl font-bold text-slate-800">Dashboard</h1>
-                        <p className="text-slate-600 mt-1">
-                            {selectedMonth === 'current' 
-                                ? `${mesesNombres[currentMonth]} ${currentYear}` 
-                                : selectedMonth === 'all'
-                                ? `Todo el año ${currentYear}`
-                                : (() => {
-                                    const [year, month] = selectedMonth.split('-');
-                                    return `${mesesNombres[parseInt(month)]} ${year}`;
-                                })()
-                            }
-                        </p>
+                        <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}
+                            className="mt-2 px-3 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                            <option value="current">Mes actual · {mesesNombres[currentMonth]} {currentYear}</option>
+                            <option value="all">Todos</option>
+                            {monthOptions.map(opt => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                        </select>
                     </div>
                     
                     {/* Hero: Total vendido + Efectividad */}
