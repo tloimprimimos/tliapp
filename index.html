@@ -58,7 +58,7 @@
     
     <!-- React App -->
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useRef } = React;
 
         // ── Tasa BCV: fetch compartido ────────────────────────────────
         async function fetchBCVRateFromAPI() {
@@ -976,7 +976,9 @@
         }
 
         // ── Payments View ─────────────────────────────────────────────
-        function PaymentsView({ quotes, config, onAddPayment, onDeletePayment, onMarkCobrado, onViewQuote }) {
+        function PaymentsView({ quotes, config, onAddPayment, onEditPayment, onDeletePayment, onMarkCobrado, onViewQuote }) {
+            const savingRef = useRef(false);
+            const [editingPay, setEditingPay] = useState(null); // id del pago que se está editando
             const [search, setSearch] = useState('');
             const [filter, setFilter] = useState('pendiente');
             const [expandedId, setExpandedId] = useState(null);
@@ -1013,22 +1015,35 @@
             const totalCobrado   = relevant.filter(q => payStatus(q) === 'cobrado').reduce((s,q) => s + getTotal(q), 0);
 
             const handleAdd = async (quoteId) => {
+                if (savingRef.current) return; // evita doble clic = pago duplicado
                 if (!payForm.amount || isNaN(parseFloat(payForm.amount)) || parseFloat(payForm.amount) <= 0) {
                     toast('Ingresá un monto válido', 'warning'); return;
                 }
+                savingRef.current = true;
                 setSaving(true);
                 try {
-                    await onAddPayment(quoteId, {
-                        id: Date.now().toString(),
-                        amount: parseFloat(payForm.amount),
-                        date: payForm.date,
-                        note: payForm.note,
-                        method: payForm.method || '',
-                        bcvRate: config?.bcvRate || 0
-                    });
+                    if (editingPay) {
+                        // Editar un pago existente: se modifica EN SU LUGAR (mismo id), no se crea otro
+                        await onEditPayment(quoteId, editingPay, {
+                            amount: parseFloat(payForm.amount),
+                            date: payForm.date,
+                            note: payForm.note,
+                            method: payForm.method || ''
+                        });
+                    } else {
+                        await onAddPayment(quoteId, {
+                            id: Date.now().toString(),
+                            amount: parseFloat(payForm.amount),
+                            date: payForm.date,
+                            note: payForm.note,
+                            method: payForm.method || '',
+                            bcvRate: config?.bcvRate || 0
+                        });
+                    }
                     setPayForm(emptyPay());
                     setAddingTo(null);
-                } finally { setSaving(false); }
+                    setEditingPay(null);
+                } finally { savingRef.current = false; setSaving(false); }
             };
 
             const sBadge = s => ({ cobrado:'bg-violet-100 text-violet-700', parcial:'bg-amber-100 text-amber-700', pendiente:'bg-slate-100 text-slate-600' }[s]||'bg-slate-100 text-slate-600');
@@ -1127,7 +1142,15 @@
                                                             {p.method && <span className="text-xs font-semibold text-violet-700 bg-violet-100 rounded-full px-2 py-0.5 ml-2">{p.method}</span>}
                                                             {p.note && <span className="text-xs text-slate-500 ml-2">— {p.note}</span>}
                                                         </div>
-                                                        <button onClick={() => onDeletePayment(q.id, p.id)}
+                                                        <button title="Editar pago"
+                                                            onClick={() => {
+                                                                setAddingTo(q.id); setEditingPay(p.id);
+                                                                setPayForm({ amount: String(p.amount), date: p.date || todayLocal(), note: p.note || '', method: p.method || '' });
+                                                            }}
+                                                            className="text-slate-400 hover:text-violet-600 p-1 rounded-lg hover:bg-violet-50 transition-colors">
+                                                            <Icons.Edit2 className="w-3.5 h-3.5"/>
+                                                        </button>
+                                                        <button title="Eliminar pago" onClick={() => onDeletePayment(q.id, p.id)}
                                                             className="text-red-400 hover:text-red-600 p-1 rounded-lg hover:bg-red-50 transition-colors">
                                                             <Icons.Trash2 className="w-3.5 h-3.5"/>
                                                         </button>
@@ -1137,8 +1160,9 @@
 
                                             {addingTo === q.id ? (
                                                 <div className="bg-violet-50 rounded-xl p-3 space-y-2">
+                                                    {editingPay && <p className="text-xs font-bold text-violet-700 uppercase tracking-wider">Editando pago</p>}
                                                     {/* Botones de acceso rápido */}
-                                                    <div className="flex gap-1.5">
+                                                    {!editingPay && <div className="flex gap-1.5">
                                                         {[['Completo', balance], ['70%', total * 0.7], ['50%', total * 0.5]].map(([label, val]) => (
                                                             <button key={label} type="button"
                                                                 onClick={() => setPayForm(f => ({...f, amount: val.toFixed(2)}))}
@@ -1150,7 +1174,7 @@
                                                                 {label} · ${val.toFixed(2)}
                                                             </button>
                                                         ))}
-                                                    </div>
+                                                    </div>}
                                                     <div className="flex gap-2">
                                                         <input type="number" placeholder="Monto" value={payForm.amount}
                                                             onChange={e => setPayForm(f => ({...f, amount: e.target.value}))}
@@ -1176,18 +1200,18 @@
                                                         onChange={e => setPayForm(f => ({...f, note: e.target.value}))}
                                                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"/>
                                                     <div className="flex gap-2 justify-end">
-                                                        <button onClick={() => { setAddingTo(null); setPayForm(emptyPay()); }}
+                                                        <button onClick={() => { setAddingTo(null); setEditingPay(null); setPayForm(emptyPay()); }}
                                                             className="px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">Cancelar</button>
                                                         <button onClick={() => handleAdd(q.id)} disabled={saving}
                                                             className="px-4 py-1.5 text-sm font-semibold text-white rounded-lg transition-colors disabled:opacity-50"
                                                             style={{background:'linear-gradient(135deg,#7c3aed,#6d28d9)'}}>
-                                                            {saving ? 'Guardando...' : 'Guardar pago'}
+                                                            {saving ? 'Guardando...' : (editingPay ? 'Guardar cambios' : 'Guardar pago')}
                                                         </button>
                                                     </div>
                                                 </div>
                                             ) : (
                                                 <div className="flex flex-wrap gap-2">
-                                                    <button onClick={() => { setAddingTo(q.id); setPayForm(emptyPay()); }}
+                                                    <button onClick={() => { setAddingTo(q.id); setEditingPay(null); setPayForm(emptyPay()); }}
                                                         className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-lg transition-colors">
                                                         <Icons.Plus className="w-3.5 h-3.5"/>Agregar pago
                                                     </button>
@@ -1552,7 +1576,9 @@
                     quote.status = 'borrador';
                 }
 
-                const { id, ...data } = quote;
+                // Los pagos se gestionan SOLO desde Cobros: al guardar el presupuesto no se tocan
+                // (así no se pisan ni se "resucitan" pagos borrados con una copia vieja del formulario)
+                const { id, payments: _ignoredPayments, ...data } = quote;
                 const cleanData = cleanForFirestore(data);
 
                 let quoteId = id;
@@ -1619,7 +1645,8 @@
                 const day   = String(now.getDate()).padStart(2, '0');
                 const prefix = `${year}-${month}${day}`;
                 const count = quotes.filter(q => (q.number || '').startsWith(prefix)).length;
-                const { id, ...data } = quote;
+                // Al duplicar NO se copian los pagos: pertenecen al presupuesto original
+                const { id, payments: _ignoredPayments, ...data } = quote;
                 const newQuote = {
                     ...data,
                     number: `${prefix}${count + 1}`,
@@ -1801,12 +1828,35 @@
                 }
             };
 
+            // Si tras cambiar los pagos ya no cubren el total, un presupuesto 'cobrado' vuelve a 'aceptado'
+            const quoteTotal = (quote) => {
+                const sub = (quote.items||[]).reduce((s,i) => s + ((i.quantity||0)*(i.unitPrice||0)), 0);
+                return quote.includeIva ? sub * 1.16 : sub;
+            };
+            const statusAfterPayments = (quote, payments) => {
+                const paid = payments.reduce((s,p) => s + (parseFloat(p.amount)||0), 0);
+                const total = quoteTotal(quote);
+                if (quote.status === 'cobrado' && total > 0 && paid < total - 0.001) return 'aceptado';
+                if (quote.status === 'aceptado' && total > 0 && paid >= total - 0.001) return 'cobrado';
+                return quote.status;
+            };
+
             const deletePaymentFromQuote = async (quoteId, paymentId) => {
                 const quote = quotes.find(q => q.id === quoteId);
                 if (!quote) return;
+                if (!window.confirm('¿Eliminar este pago?')) return;
                 const payments = (quote.payments||[]).filter(p => p.id !== paymentId);
-                await db.collection('quotes').doc(quoteId).update({ payments });
+                await db.collection('quotes').doc(quoteId).update({ payments, status: statusAfterPayments(quote, payments) });
                 toast('Pago eliminado');
+            };
+
+            // Editar un pago en su lugar (mismo id): nunca crea un pago nuevo
+            const editPaymentInQuote = async (quoteId, paymentId, changes) => {
+                const quote = quotes.find(q => q.id === quoteId);
+                if (!quote) return;
+                const payments = (quote.payments||[]).map(p => p.id === paymentId ? { ...p, ...changes } : p);
+                await db.collection('quotes').doc(quoteId).update({ payments, status: statusAfterPayments(quote, payments) });
+                toast('Pago actualizado');
             };
 
             // Limpieza automática: elimina tareas de entrega de presupuestos rechazados
@@ -1934,6 +1984,7 @@
                                 quotes={quotes}
                                 config={config}
                                 onAddPayment={addPaymentToQuote}
+                                onEditPayment={editPaymentInQuote}
                                 onDeletePayment={deletePaymentFromQuote}
                                 onMarkCobrado={markQuoteCobrado}
                                 onViewQuote={(q) => { setCurrentQuote(q); setView('quote'); }}
