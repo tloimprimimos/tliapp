@@ -3591,6 +3591,11 @@
             const totalIn  = shownDays.reduce((s, d) => s + d.totalIn, 0);
             const totalOut = shownDays.reduce((s, d) => s + d.totalOut, 0);
             const net = totalIn - totalOut;
+            const countIn  = shownDays.reduce((s, d) => s + d.ins.length, 0);
+            const countOut = shownDays.reduce((s, d) => s + d.outs.length, 0);
+            const periodLabel = period === 'all'
+                ? 'Todo'
+                : `${mesesNombres[parseInt(period.slice(5,7)) - 1]} ${period.slice(0,4)}`;
 
             // Opciones de mes
             const monthOptions = [];
@@ -3620,14 +3625,14 @@
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                         <div className="rounded-2xl p-5 text-white" style={{background:'linear-gradient(135deg,#10b981,#059669)'}}>
-                            <p className="text-xs font-bold opacity-70 uppercase tracking-widest mb-1">Entradas</p>
+                            <p className="text-xs font-bold opacity-70 uppercase tracking-widest mb-1">Total cobros · {periodLabel}</p>
                             <p className="text-3xl font-extrabold">{money(totalIn)}</p>
-                            <p className="text-xs opacity-60 mt-1">cobros registrados</p>
+                            <p className="text-xs opacity-60 mt-1">{countIn} cobro{countIn !== 1 ? 's' : ''} registrado{countIn !== 1 ? 's' : ''}</p>
                         </div>
                         <div className="rounded-2xl p-5 text-white" style={{background:'linear-gradient(135deg,#ef4444,#dc2626)'}}>
-                            <p className="text-xs font-bold opacity-70 uppercase tracking-widest mb-1">Salidas</p>
+                            <p className="text-xs font-bold opacity-70 uppercase tracking-widest mb-1">Total gastos · {periodLabel}</p>
                             <p className="text-3xl font-extrabold">{money(totalOut)}</p>
-                            <p className="text-xs opacity-60 mt-1">gastos registrados</p>
+                            <p className="text-xs opacity-60 mt-1">{countOut} gasto{countOut !== 1 ? 's' : ''} registrado{countOut !== 1 ? 's' : ''}</p>
                         </div>
                         <div className="rounded-2xl p-5 text-white" style={{background: net >= 0 ? 'linear-gradient(135deg,#4f46e5,#7c3aed)' : 'linear-gradient(135deg,#f59e0b,#d97706)'}}>
                             <p className="text-xs font-bold opacity-70 uppercase tracking-widest mb-1">Neto del período</p>
