@@ -35,6 +35,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 </head>
 <body>
@@ -975,12 +976,13 @@
         }
 
         // ── Payments View ─────────────────────────────────────────────
-        function PaymentsView({ quotes, onAddPayment, onDeletePayment, onMarkCobrado, onViewQuote }) {
+        function PaymentsView({ quotes, config, onAddPayment, onDeletePayment, onMarkCobrado, onViewQuote }) {
             const [search, setSearch] = useState('');
             const [filter, setFilter] = useState('pendiente');
             const [expandedId, setExpandedId] = useState(null);
             const [addingTo, setAddingTo] = useState(null);
-            const [payForm, setPayForm] = useState({ amount: '', date: todayLocal(), note: '' });
+            const emptyPay = () => ({ amount: '', date: todayLocal(), note: '', method: '' });
+            const [payForm, setPayForm] = useState(emptyPay());
             const [saving, setSaving] = useState(false);
 
             const relevant = quotes.filter(q => q.status === 'aceptado' || q.status === 'cobrado');
@@ -1016,8 +1018,15 @@
                 }
                 setSaving(true);
                 try {
-                    await onAddPayment(quoteId, { id: Date.now().toString(), amount: parseFloat(payForm.amount), date: payForm.date, note: payForm.note });
-                    setPayForm({ amount: '', date: todayLocal(), note: '' });
+                    await onAddPayment(quoteId, {
+                        id: Date.now().toString(),
+                        amount: parseFloat(payForm.amount),
+                        date: payForm.date,
+                        note: payForm.note,
+                        method: payForm.method || '',
+                        bcvRate: config?.bcvRate || 0
+                    });
+                    setPayForm(emptyPay());
                     setAddingTo(null);
                 } finally { setSaving(false); }
             };
@@ -1115,6 +1124,7 @@
                                                         <div className="flex-1">
                                                             <span className="font-semibold text-slate-800 text-sm">${parseFloat(p.amount).toFixed(2)}</span>
                                                             <span className="text-xs text-slate-400 ml-2">{p.date}</span>
+                                                            {p.method && <span className="text-xs font-semibold text-violet-700 bg-violet-100 rounded-full px-2 py-0.5 ml-2">{p.method}</span>}
                                                             {p.note && <span className="text-xs text-slate-500 ml-2">— {p.note}</span>}
                                                         </div>
                                                         <button onClick={() => onDeletePayment(q.id, p.id)}
@@ -1149,11 +1159,24 @@
                                                             onChange={e => setPayForm(f => ({...f, date: e.target.value}))}
                                                             className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"/>
                                                     </div>
-                                                    <input placeholder="Nota (opcional, ej: transferencia, efectivo...)" value={payForm.note}
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {PAY_METHODS.map(m => (
+                                                            <button key={m} type="button"
+                                                                onClick={() => setPayForm(f => ({...f, method: f.method === m ? '' : m}))}
+                                                                className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                                                                    payForm.method === m
+                                                                        ? 'bg-violet-600 text-white border-violet-600'
+                                                                        : 'bg-white text-slate-600 border-slate-200 hover:bg-violet-100'
+                                                                }`}>
+                                                                {m}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                    <input placeholder="Nota (opcional, ej: referencia, banco...)" value={payForm.note}
                                                         onChange={e => setPayForm(f => ({...f, note: e.target.value}))}
                                                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"/>
                                                     <div className="flex gap-2 justify-end">
-                                                        <button onClick={() => { setAddingTo(null); setPayForm({ amount:'', date:new Date().toISOString().slice(0,10), note:'' }); }}
+                                                        <button onClick={() => { setAddingTo(null); setPayForm(emptyPay()); }}
                                                             className="px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">Cancelar</button>
                                                         <button onClick={() => handleAdd(q.id)} disabled={saving}
                                                             className="px-4 py-1.5 text-sm font-semibold text-white rounded-lg transition-colors disabled:opacity-50"
@@ -1164,7 +1187,7 @@
                                                 </div>
                                             ) : (
                                                 <div className="flex flex-wrap gap-2">
-                                                    <button onClick={() => { setAddingTo(q.id); setPayForm({ amount:'', date:todayLocal(), note:'' }); }}
+                                                    <button onClick={() => { setAddingTo(q.id); setPayForm(emptyPay()); }}
                                                         className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-lg transition-colors">
                                                         <Icons.Plus className="w-3.5 h-3.5"/>Agregar pago
                                                     </button>
@@ -1760,7 +1783,9 @@
                             id: Date.now().toString(),
                             amount: parseFloat(balance.toFixed(4)),
                             date: todayLocal(),
-                            note: 'Saldo — marcado como cobrado'
+                            note: 'Saldo — marcado como cobrado',
+                            method: '',
+                            bcvRate: config?.bcvRate || 0
                         };
                         await db.collection('quotes').doc(quoteId).update({
                             payments: [...(quote.payments||[]), payment],
@@ -1907,6 +1932,7 @@
                         {view === 'payments' && (
                             <PaymentsView
                                 quotes={quotes}
+                                config={config}
                                 onAddPayment={addPaymentToQuote}
                                 onDeletePayment={deletePaymentFromQuote}
                                 onMarkCobrado={markQuoteCobrado}
@@ -1914,7 +1940,7 @@
                             />
                         )}
                         {view === 'cashflow' && (
-                            <CashFlowView quotes={quotes} expenses={expenses} onViewQuote={(q) => { setCurrentQuote(q); setView('quote'); }} />
+                            <CashFlowView quotes={quotes} expenses={expenses} config={config} onViewQuote={(q) => { setCurrentQuote(q); setView('quote'); }} />
                         )}
                         {view === 'expenses' && (
                             <ExpensesView
@@ -1947,6 +1973,9 @@
 
         // Vendedores disponibles en el presupuesto
         const SELLERS = ['Jesus Lopez', 'Angely Ramos'];
+
+        // Métodos de pago (cobros y gastos)
+        const PAY_METHODS = ['Efectivo $', 'Efectivo Bs', 'Zelle', 'Pago Móvil', 'Transferencia', 'Punto de venta', 'Otro'];
 
         // Fecha de hoy en hora LOCAL (YYYY-MM-DD). toISOString() usa UTC y en Venezuela
         // después de las 8pm devolvería el día siguiente.
@@ -3281,7 +3310,7 @@
             const [saving, setSaving] = useState(false);
             const [currency, setCurrency] = useState('USD');
             const bcvRate = config?.bcvRate || 0;
-            const emptyForm = { date: todayLocal(), amount: '', category: 'Materiales', description: '', to: '' };
+            const emptyForm = { date: todayLocal(), amount: '', category: 'Materiales', description: '', to: '', method: '' };
             const [form, setForm] = useState(emptyForm);
 
             // Beneficiarios frecuentes: se arman solos con los nombres ya usados en gastos
@@ -3500,6 +3529,18 @@
                                         {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                                     </select>
                                 </div>
+                                <div className="md:col-span-2">
+                                    <label className="text-xs font-semibold text-slate-500 mb-1 block">Pagado con (opcional)</label>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {PAY_METHODS.map(m => (
+                                            <button key={m} type="button"
+                                                onClick={() => setForm(f => ({...f, method: f.method === m ? '' : m}))}
+                                                className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${form.method === m ? 'bg-red-600 text-white border-red-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-red-100'}`}>
+                                                {m}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
                             <div className="flex gap-2 justify-end">
                                 <button onClick={() => setShowForm(false)}
@@ -3532,6 +3573,7 @@
                                     </div>
                                     <div className="flex items-center gap-3 mt-0.5">
                                         {exp.to && <span className="text-xs text-slate-400">{exp.to}</span>}
+                                        {exp.method && <span className="text-xs font-semibold text-slate-500">{exp.method}</span>}
                                         <span className="text-xs text-slate-400">{exp.date}</span>
                                     </div>
                                 </div>
@@ -3555,41 +3597,65 @@
         }
 
         // Flujo de caja diario: entradas (pagos registrados en Cobros) vs salidas (Gastos), por día
-        function CashFlowView({ quotes, expenses, onViewQuote }) {
+        function CashFlowView({ quotes, expenses, config, onViewQuote }) {
             const mesesNombres = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-            const money = (n) => `${n < 0 ? '-' : ''}$${Math.abs(n).toFixed(2)}`;
             const todayStr = todayLocal();
+            const curRate = parseFloat(config?.bcvRate) || 0;
             const [period, setPeriod] = useState(todayStr.slice(0,7)); // 'YYYY-MM' o 'all'
             const [openDay, setOpenDay] = useState(todayStr);
+            const [cur, setCur] = useState('USD'); // 'USD' | 'VES'
 
-            // Entradas: cada pago registrado en un presupuesto
+            const pick = (usd, bs) => (cur === 'USD' ? usd : bs);
+            const money = (n) => {
+                const sign = n < 0 ? '-' : '';
+                return cur === 'USD'
+                    ? `${sign}$${Math.abs(n).toFixed(2)}`
+                    : `${sign}Bs ${Math.abs(n).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            };
+
+            // ── Movimientos (cada uno con su valor en USD y en Bs) ──────────────
+            // Bs = monto × tasa guardada en el movimiento; si no guardó tasa, se usa la tasa actual.
             const incomes = [];
             quotes.forEach(q => (q.payments || []).forEach(p => {
-                const amount = parseFloat(p.amount) || 0;
-                if (p.date && amount > 0) incomes.push({ date: p.date, amount, quote: q, note: p.note });
+                const usd = parseFloat(p.amount) || 0;
+                if (!p.date || usd <= 0) return;
+                const rate = parseFloat(p.bcvRate) || curRate;
+                incomes.push({ date: p.date, usd, bs: usd * rate, method: p.method || '', quote: q, note: p.note });
             }));
-            // Salidas: cada gasto
-            const outflows = expenses
-                .filter(e => e.date && (parseFloat(e.amount) || 0) > 0)
-                .map(e => ({ date: e.date, amount: parseFloat(e.amount) || 0, exp: e }));
+            const outflows = [];
+            expenses.forEach(e => {
+                const usd = parseFloat(e.amount) || 0;
+                if (!e.date || usd <= 0) return;
+                const bs = e.originalAmountBs
+                    ? parseFloat(e.originalAmountBs) || 0
+                    : usd * ((parseFloat(e.bcvRateUsed) || curRate));
+                outflows.push({ date: e.date, usd, bs, method: e.method || '', category: e.category || 'Otro', exp: e });
+            });
 
-            // Agrupar por día
+            // ── Agrupar por día + acumulado histórico ───────────────────────────
             const byDay = {};
-            const dayOf = (d) => (byDay[d] = byDay[d] || { date: d, ins: [], outs: [], totalIn: 0, totalOut: 0 });
-            incomes.forEach(i => { const d = dayOf(i.date); d.ins.push(i); d.totalIn += i.amount; });
-            outflows.forEach(o => { const d = dayOf(o.date); d.outs.push(o); d.totalOut += o.amount; });
-
-            // Acumulado histórico (orden cronológico)
+            const dayOf = (d) => (byDay[d] = byDay[d] || { date: d, ins: [], outs: [] });
+            incomes.forEach(i => dayOf(i.date).ins.push(i));
+            outflows.forEach(o => dayOf(o.date).outs.push(o));
+            const sumOf = (arr, k) => arr.reduce((s, x) => s + x[k], 0);
             const allDays = Object.values(byDay).sort((a, b) => a.date.localeCompare(b.date));
-            let running = 0;
-            allDays.forEach(d => { running += d.totalIn - d.totalOut; d.balance = running; });
+            let runUsd = 0, runBs = 0;
+            allDays.forEach(d => {
+                d.inUsd = sumOf(d.ins, 'usd');  d.inBs = sumOf(d.ins, 'bs');
+                d.outUsd = sumOf(d.outs, 'usd'); d.outBs = sumOf(d.outs, 'bs');
+                runUsd += d.inUsd - d.outUsd; runBs += d.inBs - d.outBs;
+                d.balUsd = runUsd; d.balBs = runBs;
+            });
+            const dIn  = (d) => pick(d.inUsd, d.inBs);
+            const dOut = (d) => pick(d.outUsd, d.outBs);
+            const dBal = (d) => pick(d.balUsd, d.balBs);
 
             const shownDays = allDays
                 .filter(d => period === 'all' || d.date.startsWith(period))
                 .sort((a, b) => b.date.localeCompare(a.date));
 
-            const totalIn  = shownDays.reduce((s, d) => s + d.totalIn, 0);
-            const totalOut = shownDays.reduce((s, d) => s + d.totalOut, 0);
+            const totalIn  = shownDays.reduce((s, d) => s + dIn(d), 0);
+            const totalOut = shownDays.reduce((s, d) => s + dOut(d), 0);
             const net = totalIn - totalOut;
             const countIn  = shownDays.reduce((s, d) => s + d.ins.length, 0);
             const countOut = shownDays.reduce((s, d) => s + d.outs.length, 0);
@@ -3597,7 +3663,34 @@
                 ? 'Todo'
                 : `${mesesNombres[parseInt(period.slice(5,7)) - 1]} ${period.slice(0,4)}`;
 
-            // Opciones de mes
+            // ── Por método de pago ──────────────────────────────────────────────
+            const methodRows = (() => {
+                const map = {};
+                const add = (name, kind, it) => {
+                    const k = name || 'Sin especificar';
+                    map[k] = map[k] || { name: k, inUsd: 0, inBs: 0, outUsd: 0, outBs: 0 };
+                    map[k][kind + 'Usd'] += it.usd; map[k][kind + 'Bs'] += it.bs;
+                };
+                shownDays.forEach(d => { d.ins.forEach(i => add(i.method, 'in', i)); d.outs.forEach(o => add(o.method, 'out', o)); });
+                return Object.values(map).sort((a, b) => (b.inUsd + b.outUsd) - (a.inUsd + a.outUsd));
+            })();
+
+            // ── Gastos por categoría ────────────────────────────────────────────
+            const categoryRows = (() => {
+                const map = {};
+                shownDays.forEach(d => d.outs.forEach(o => {
+                    map[o.category] = map[o.category] || { name: o.category, usd: 0, bs: 0, n: 0 };
+                    map[o.category].usd += o.usd; map[o.category].bs += o.bs; map[o.category].n += 1;
+                }));
+                return Object.values(map).sort((a, b) => b.usd - a.usd);
+            })();
+            const totalOutUsd = categoryRows.reduce((s, r) => s + r.usd, 0);
+
+            // ── Gráfico diario (cronológico, máx. 31 días) ──────────────────────
+            const chartDays = [...shownDays].reverse().slice(-31);
+            const chartMax = Math.max(1, ...chartDays.flatMap(d => [dIn(d), dOut(d)]));
+
+            // ── Opciones de mes ─────────────────────────────────────────────────
             const monthOptions = [];
             const first = allDays.length ? allDays[0].date.slice(0,7) : todayStr.slice(0,7);
             let [y, m] = first.split('-').map(Number);
@@ -3615,6 +3708,76 @@
             };
 
             const cobradosSinPagos = quotes.filter(q => q.status === 'cobrado' && !(q.payments || []).length).length;
+
+            // ── Exportar ────────────────────────────────────────────────────────
+            const r2 = (n) => Math.round(n * 100) / 100;
+            const exportExcel = () => {
+                if (!window.XLSX) { toast('No se pudo cargar el exportador de Excel. Revisa tu conexión.', 'error'); return; }
+                if (!shownDays.length) { toast('No hay movimientos para exportar', 'warning'); return; }
+                const asc = [...shownDays].reverse();
+                const mov = [['Fecha','Tipo','Cliente / Descripción','Presupuesto','Método','Categoría','Beneficiario','Nota','Monto USD','Monto Bs']];
+                asc.forEach(d => {
+                    d.ins.forEach(i => mov.push([d.date, 'Entrada', i.quote.client?.name || '', i.quote.number || '', i.method, '', '', i.note || '', r2(i.usd), r2(i.bs)]));
+                    d.outs.forEach(o => mov.push([d.date, 'Salida', o.exp.description || '', '', o.method, o.category, o.exp.to || '', '', r2(-o.usd), r2(-o.bs)]));
+                });
+                const dias = [['Fecha','Entradas USD','Salidas USD','Neto USD','Acumulado USD','Entradas Bs','Salidas Bs','Neto Bs','Acumulado Bs']];
+                asc.forEach(d => dias.push([d.date, r2(d.inUsd), r2(d.outUsd), r2(d.inUsd - d.outUsd), r2(d.balUsd), r2(d.inBs), r2(d.outBs), r2(d.inBs - d.outBs), r2(d.balBs)]));
+                const met = [['Método','Entradas USD','Salidas USD','Entradas Bs','Salidas Bs']];
+                methodRows.forEach(r => met.push([r.name, r2(r.inUsd), r2(r.outUsd), r2(r.inBs), r2(r.outBs)]));
+                const cat = [['Categoría de gasto','Gastos','Total USD','Total Bs']];
+                categoryRows.forEach(r => cat.push([r.name, r.n, r2(r.usd), r2(r.bs)]));
+                const wb = window.XLSX.utils.book_new();
+                [['Movimientos', mov], ['Por día', dias], ['Por método', met], ['Gastos por categoría', cat]].forEach(([name, rows]) => {
+                    const ws = window.XLSX.utils.aoa_to_sheet(rows);
+                    ws['!cols'] = rows[0].map((_, c) => ({ wch: Math.min(40, Math.max(12, ...rows.map(r => String(r[c] ?? '').length + 2))) }));
+                    window.XLSX.utils.book_append_sheet(wb, ws, name);
+                });
+                window.XLSX.writeFile(wb, `flujo-de-caja-${period}.xlsx`);
+            };
+
+            const exportPdf = () => {
+                const JsPDF = window.jspdf && window.jspdf.jsPDF;
+                if (!JsPDF) { toast('No se pudo cargar el exportador de PDF. Revisa tu conexión.', 'error'); return; }
+                if (!shownDays.length) { toast('No hay movimientos para exportar', 'warning'); return; }
+                const doc = new JsPDF();
+                let yy = 18;
+                const need = (h) => { if (yy + h > 282) { doc.addPage(); yy = 18; } };
+                doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
+                doc.text(`Flujo de Caja - ${periodLabel}`, 14, yy); yy += 6;
+                doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(100);
+                doc.text(`Te lo Imprimo · Montos en ${cur === 'USD' ? 'dólares (USD)' : 'bolívares (Bs)'} · Generado ${todayStr}`, 14, yy); yy += 9;
+                doc.setTextColor(0);
+                doc.setFontSize(11); doc.setFont('helvetica', 'bold');
+                doc.text(`Entradas: ${money(totalIn)}   Salidas: ${money(totalOut)}   Neto: ${money(net)}`, 14, yy); yy += 9;
+
+                const head = (cols) => {
+                    need(10);
+                    doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+                    doc.setFillColor(241, 245, 249); doc.rect(14, yy - 4.5, 182, 6.5, 'F');
+                    cols.forEach(([t, x, al]) => doc.text(t, x, yy, { align: al }));
+                    yy += 6; doc.setFont('helvetica', 'normal');
+                };
+                const row = (cols) => { need(6); cols.forEach(([t, x, al]) => doc.text(String(t), x, yy, { align: al })); yy += 5.5; };
+
+                doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.text('Por día', 14, yy); yy += 6;
+                head([['Fecha', 14, 'left'], ['Entradas', 100, 'right'], ['Salidas', 130, 'right'], ['Neto', 160, 'right'], ['Acumulado', 196, 'right']]);
+                doc.setFontSize(9);
+                shownDays.forEach(d => row([[fmtDay(d.date), 14, 'left'], [money(dIn(d)), 100, 'right'], [money(dOut(d)), 130, 'right'], [money(dIn(d) - dOut(d)), 160, 'right'], [money(dBal(d)), 196, 'right']]));
+
+                yy += 5; need(20);
+                doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.text('Por método de pago', 14, yy); yy += 6;
+                head([['Método', 14, 'left'], ['Entradas', 120, 'right'], ['Salidas', 160, 'right']]);
+                doc.setFontSize(9);
+                methodRows.forEach(r => row([[r.name, 14, 'left'], [money(pick(r.inUsd, r.inBs)), 120, 'right'], [money(pick(r.outUsd, r.outBs)), 160, 'right']]));
+
+                yy += 5; need(20);
+                doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.text('Gastos por categoría', 14, yy); yy += 6;
+                head([['Categoría', 14, 'left'], ['Cant.', 100, 'right'], ['Total', 140, 'right'], ['%', 170, 'right']]);
+                doc.setFontSize(9);
+                categoryRows.forEach(r => row([[r.name, 14, 'left'], [r.n, 100, 'right'], [money(pick(r.usd, r.bs)), 140, 'right'], [`${totalOutUsd > 0 ? (r.usd / totalOutUsd * 100).toFixed(0) : 0}%`, 170, 'right']]));
+
+                doc.save(`flujo-de-caja-${period}.pdf`);
+            };
 
             return (
                 <div className="max-w-4xl mx-auto p-6">
@@ -3647,17 +3810,104 @@
                             <option value="all">Todo el historial</option>
                             {monthOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                         </select>
+                        <div className="flex rounded-xl border border-slate-200 overflow-hidden text-xs font-bold">
+                            <button type="button" onClick={() => setCur('USD')}
+                                className={`px-3 py-2 transition-colors ${cur === 'USD' ? 'bg-slate-700 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>$ USD</button>
+                            <button type="button" onClick={() => setCur('VES')}
+                                className={`px-3 py-2 transition-colors ${cur === 'VES' ? 'bg-slate-700 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>Bs</button>
+                        </div>
                         <span className="text-xs text-slate-400">
                             {shownDays.length} día{shownDays.length !== 1 ? 's' : ''} con movimiento
                             {' · '}<span className="text-emerald-600 font-semibold">{shownDays.filter(d => d.ins.length > 0).length} con entradas</span>
                             {' · '}<span className="text-red-500 font-semibold">{shownDays.filter(d => d.outs.length > 0).length} con salidas</span>
                         </span>
+                        <div className="ml-auto flex gap-2">
+                            <button onClick={exportExcel}
+                                className="px-3 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-colors">Excel</button>
+                            <button onClick={exportPdf}
+                                className="px-3 py-2 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 rounded-xl transition-colors">PDF</button>
+                        </div>
                     </div>
+
+                    {cur === 'VES' && (
+                        <div className="mb-4 px-4 py-3 bg-slate-100 rounded-xl text-xs text-slate-600">
+                            {curRate > 0
+                                ? <>Bs = monto × la tasa guardada en cada cobro o gasto. Si un registro no guardó su tasa (los anteriores a este cambio, o gastos hechos en $), se usa la tasa actual: <b>Bs {curRate.toFixed(2)}</b>.</>
+                                : <>⚠ Configura la tasa BCV en Configuración para ver los montos en Bs.</>}
+                        </div>
+                    )}
 
                     {cobradosSinPagos > 0 && (
                         <div className="mb-4 px-4 py-3 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700">
                             {cobradosSinPagos} presupuesto{cobradosSinPagos !== 1 ? 's' : ''} marcado{cobradosSinPagos !== 1 ? 's' : ''} como cobrado sin pagos registrados no aparece{cobradosSinPagos !== 1 ? 'n' : ''} aquí (no tienen fecha de cobro). Entra en Cobros y agrega el pago para que cuente.
                         </div>
+                    )}
+
+                    {shownDays.length > 0 && (
+                        <>
+                            {/* Gráfico diario */}
+                            <div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-4 mb-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Entradas vs salidas por día</p>
+                                    <div className="flex items-center gap-3 text-xs text-slate-500">
+                                        <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-sm bg-emerald-500"/>Entradas</span>
+                                        <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-sm bg-red-400"/>Salidas</span>
+                                    </div>
+                                </div>
+                                <div className="flex items-end gap-1 overflow-x-auto" style={{height:120}}>
+                                    {chartDays.map(d => (
+                                        <div key={d.date} className="flex-1 min-w-[14px] h-full flex items-end justify-center gap-px"
+                                            title={`${fmtDay(d.date)}\nEntradas: ${money(dIn(d))}\nSalidas: ${money(dOut(d))}`}>
+                                            <div className="w-1/2 bg-emerald-500 rounded-t" style={{height: `${Math.max(dIn(d) > 0 ? 2 : 0, dIn(d) / chartMax * 100)}%`}}/>
+                                            <div className="w-1/2 bg-red-400 rounded-t" style={{height: `${Math.max(dOut(d) > 0 ? 2 : 0, dOut(d) / chartMax * 100)}%`}}/>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="flex gap-1 mt-1">
+                                    {chartDays.map(d => (
+                                        <span key={d.date} className="flex-1 min-w-[14px] text-center text-[10px] text-slate-400">{d.date.slice(8)}</span>
+                                    ))}
+                                </div>
+                                {period === 'all' && allDays.length > 31 && (
+                                    <p className="text-xs text-slate-400 mt-2">Mostrando los últimos 31 días con movimiento.</p>
+                                )}
+                            </div>
+
+                            {/* Por método + por categoría */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                                <div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-4">
+                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Por método de pago</p>
+                                    <div className="grid grid-cols-3 text-xs text-slate-400 font-semibold pb-1 border-b border-slate-100">
+                                        <span>Método</span><span className="text-right">Entró</span><span className="text-right">Salió</span>
+                                    </div>
+                                    {methodRows.map(r => (
+                                        <div key={r.name} className="grid grid-cols-3 text-sm py-1.5 border-b border-slate-50 last:border-0">
+                                            <span className={`truncate ${r.name === 'Sin especificar' ? 'text-slate-400 italic' : 'text-slate-700'}`}>{r.name}</span>
+                                            <span className="text-right text-emerald-600 font-semibold">{r.inUsd > 0 ? money(pick(r.inUsd, r.inBs)) : '—'}</span>
+                                            <span className="text-right text-red-500 font-semibold">{r.outUsd > 0 ? money(pick(r.outUsd, r.outBs)) : '—'}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-4">
+                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Gastos por categoría</p>
+                                    {categoryRows.length === 0 && <p className="text-sm text-slate-400">Sin gastos en este período</p>}
+                                    {categoryRows.map(r => {
+                                        const pct = totalOutUsd > 0 ? r.usd / totalOutUsd * 100 : 0;
+                                        return (
+                                            <div key={r.name} className="mb-2.5 last:mb-0">
+                                                <div className="flex justify-between text-sm">
+                                                    <span className="text-slate-700">{r.name} <span className="text-xs text-slate-400">({r.n})</span></span>
+                                                    <span className="font-semibold text-slate-700">{money(pick(r.usd, r.bs))} <span className="text-xs text-slate-400 font-normal">{pct.toFixed(0)}%</span></span>
+                                                </div>
+                                                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1">
+                                                    <div className="h-full bg-red-400 rounded-full" style={{width: `${pct}%`}}/>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </>
                     )}
 
                     <div className="space-y-2">
@@ -3668,7 +3918,7 @@
                             </div>
                         )}
                         {shownDays.map(d => {
-                            const dayNet = d.totalIn - d.totalOut;
+                            const dayNet = dIn(d) - dOut(d);
                             const isOpen = openDay === d.date;
                             return (
                                 <div key={d.date} className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
@@ -3679,12 +3929,12 @@
                                             <p className="text-xs text-slate-400 mt-0.5">{d.ins.length} cobro{d.ins.length !== 1 ? 's' : ''} · {d.outs.length} gasto{d.outs.length !== 1 ? 's' : ''}</p>
                                         </div>
                                         <div className="text-right text-xs flex-shrink-0">
-                                            <p className="text-emerald-600 font-semibold">+ {money(d.totalIn)}</p>
-                                            <p className="text-red-500 font-semibold">− {money(d.totalOut)}</p>
+                                            <p className="text-emerald-600 font-semibold">+ {money(dIn(d))}</p>
+                                            <p className="text-red-500 font-semibold">− {money(dOut(d))}</p>
                                         </div>
-                                        <div className="text-right flex-shrink-0 w-24">
+                                        <div className="text-right flex-shrink-0 w-28">
                                             <p className={`font-bold ${dayNet >= 0 ? 'text-slate-800' : 'text-amber-600'}`}>{money(dayNet)}</p>
-                                            <p className="text-xs text-slate-400">acum. {money(d.balance)}</p>
+                                            <p className="text-xs text-slate-400">acum. {money(dBal(d))}</p>
                                         </div>
                                     </button>
                                     {isOpen && (
@@ -3698,10 +3948,11 @@
                                                             <p className="text-sm text-slate-700 truncate">{i.quote.client?.name || 'Sin cliente'}</p>
                                                             <p className="text-xs text-slate-400">
                                                                 <button onClick={() => onViewQuote(i.quote)} className="underline hover:text-indigo-600">#{i.quote.number}</button>
+                                                                {i.method ? ` · ${i.method}` : ''}
                                                                 {i.note ? ` · ${i.note}` : ''}
                                                             </p>
                                                         </div>
-                                                        <span className="text-sm font-bold text-emerald-600 flex-shrink-0">{money(i.amount)}</span>
+                                                        <span className="text-sm font-bold text-emerald-600 flex-shrink-0">{money(pick(i.usd, i.bs))}</span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -3712,9 +3963,9 @@
                                                     <div key={idx} className="flex items-start justify-between gap-2 py-1.5 border-b border-slate-100 last:border-0">
                                                         <div className="min-w-0">
                                                             <p className="text-sm text-slate-700 truncate">{o.exp.description}</p>
-                                                            <p className="text-xs text-slate-400">{[o.exp.to, o.exp.category].filter(Boolean).join(' · ')}</p>
+                                                            <p className="text-xs text-slate-400">{[o.exp.to, o.category, o.method].filter(Boolean).join(' · ')}</p>
                                                         </div>
-                                                        <span className="text-sm font-bold text-red-600 flex-shrink-0">{money(o.amount)}</span>
+                                                        <span className="text-sm font-bold text-red-600 flex-shrink-0">{money(pick(o.usd, o.bs))}</span>
                                                     </div>
                                                 ))}
                                             </div>
